@@ -20,6 +20,8 @@ const scheduleSchema = new Schema(
     }
 );
 
+// Activity Schema
+
 const activitySchema = new Schema(
     {
 
@@ -43,7 +45,6 @@ const activitySchema = new Schema(
             type: Schema.Types.ObjectId,
             ref: "Destination",
             required: true,
-            index: true,
         },
 
         // Location
@@ -75,6 +76,8 @@ const activitySchema = new Schema(
                 required: true,
             },
         },
+
+        // Activity Details
 
         category: {
             type: String,
@@ -132,6 +135,8 @@ const activitySchema = new Schema(
             default: "Easy",
         },
 
+        // Participants
+
         minimumAge: {
             type: Number,
             default: 0,
@@ -151,6 +156,8 @@ const activitySchema = new Schema(
             type: Number,
             default: 20,
         },
+
+        // Schedule
 
         schedule: [
             scheduleSchema,
@@ -178,6 +185,8 @@ const activitySchema = new Schema(
             default: "",
         },
 
+        // Ratings
+
         averageRating: {
             type: Number,
             default: 0,
@@ -189,6 +198,8 @@ const activitySchema = new Schema(
             type: Number,
             default: 0,
         },
+
+        // Images
 
         coverImage: {
             url: String,
@@ -203,6 +214,8 @@ const activitySchema = new Schema(
                 caption: String,
             },
         ],
+
+        // Statistics
 
         statistics: {
             totalBookings: {
@@ -245,6 +258,8 @@ const activitySchema = new Schema(
         timestamps: true,
     }
 );
+
+// Indexes
 
 activitySchema.index({
     location: "2dsphere",

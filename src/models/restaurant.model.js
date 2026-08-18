@@ -52,11 +52,8 @@ const menuCategorySchema = new Schema(
     }
 );
 
-// Restaurant Schema
-
 const restaurantSchema = new Schema(
     {
-        // Basic Information
 
         name: {
             type: String,
@@ -81,10 +78,7 @@ const restaurantSchema = new Schema(
             type: Schema.Types.ObjectId,
             ref: "Destination",
             required: true,
-            index: true,
         },
-
-        // Address
 
         address: {
             type: String,
@@ -116,8 +110,6 @@ const restaurantSchema = new Schema(
             },
         },
 
-        // Restaurant Details
-
         cuisine: [
             String,
         ],
@@ -147,8 +139,6 @@ const restaurantSchema = new Schema(
             default: "INR",
         },
 
-        // Ratings
-
         averageRating: {
             type: Number,
             default: 0,
@@ -160,8 +150,6 @@ const restaurantSchema = new Schema(
             type: Number,
             default: 0,
         },
-
-        // Facilities
 
         amenities: [
             String,
@@ -210,19 +198,14 @@ const restaurantSchema = new Schema(
             default: "",
         },
 
-        // Timing
 
         openingHours: [
             openingHoursSchema,
         ],
 
-        // Menu
-
         menu: [
             menuCategorySchema,
         ],
-
-        // Images
 
         coverImage: {
             url: String,
@@ -279,7 +262,6 @@ const restaurantSchema = new Schema(
         timestamps: true,
     }
 );
-
 restaurantSchema.index({
     location: "2dsphere",
 });

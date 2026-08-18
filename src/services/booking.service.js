@@ -92,6 +92,101 @@ const validateReferences = async (
     }
 };
 
+const createPassengerSnapshots = async ({
+    travelerIds,
+    user,
+}) => {
+    if (
+        !travelerIds ||
+        travelerIds.length === 0
+    ) {
+        return [];
+    }
+
+    const uniqueTravelerIds = [
+        ...new Set(
+            travelerIds.map(
+                (id) => String(id)
+            )
+        ),
+    ];
+
+    const travelers =
+        await Traveler.find({
+            _id: {
+                $in: uniqueTravelerIds,
+            },
+            user,
+            isActive: true,
+        });
+
+    if (
+        travelers.length !==
+        uniqueTravelerIds.length
+    ) {
+        throw new ApiError(
+            404,
+            "One or more travelers were not found."
+        );
+    }
+
+    return travelers.map(
+        (traveler) => ({
+            traveler:
+                traveler._id,
+
+            firstName:
+                traveler.firstName,
+
+            lastName:
+                traveler.lastName,
+
+            dateOfBirth:
+                traveler.dateOfBirth,
+
+            gender:
+                traveler.gender,
+
+            nationality:
+                traveler.nationality,
+
+            email:
+                traveler.email,
+
+            phone:
+                traveler.phone,
+
+            travelerType:
+                traveler.travelerType,
+
+            passport:
+                traveler.passport
+                    ? {
+                        passportNumber:
+                            traveler
+                                .passport
+                                .passportNumber,
+
+                        issueDate:
+                            traveler
+                                .passport
+                                .issueDate,
+
+                        expiryDate:
+                            traveler
+                                .passport
+                                .expiryDate,
+
+                        issuingCountry:
+                            traveler
+                                .passport
+                                .issuingCountry,
+                    }
+                    : null,
+        })
+    );
+};
+
 const createBooking = async (
     bookingData
 ) => {

@@ -1,12 +1,16 @@
 import mongoose from "mongoose";
 import slugify from "slugify";
 import { Restaurant } from "../models/restaurant.model.js";
-import { Destination } from "../models/destinations.model.js";
+import { Destination } from "../models/destination.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import {
     uploadOnCloudinary,
     deleteFromCloudinary,
 } from "../utils/cloudinary.js";
+import {
+    geoapifyClient,
+    GEOAPIFY_API_KEY,
+} from "../config/geoapify.js";
 
 const generateSlug = (
     name,
@@ -99,6 +103,7 @@ const createRestaurant = async ({
     let uploadedGalleryImages = [];
 
     try {
+        // Upload Cover Image
         
         if (coverImage) {
             const response =
@@ -120,6 +125,8 @@ const createRestaurant = async ({
                 caption: restaurantData.name,
             };
         }
+
+        // Upload Gallery Images
 
         if (galleryImages.length > 0) {
             uploadedGalleryImages =
@@ -162,6 +169,8 @@ const createRestaurant = async ({
     }
 };
 
+// Get All Restaurants
+
 const getAllRestaurants = async ({
     page = 1,
     limit = 10,
@@ -183,6 +192,8 @@ const getAllRestaurants = async ({
     const query = {
         isActive: true,
     };
+
+    // Search
    
     if (search) {
         query.$or = [
@@ -261,6 +272,8 @@ const getAllRestaurants = async ({
         query.isFeatured =
             isFeatured === "true";
     }
+
+    // Sorting
     
     let sortOption = {
         createdAt: -1,
@@ -346,6 +359,8 @@ const getAllRestaurants = async ({
     };
 };
 
+// Get Restaurant By ID
+
 const getRestaurantById = async (
     restaurantId
 ) => {
@@ -380,6 +395,8 @@ const getRestaurantById = async (
 
     return restaurant;
 };
+
+// Search Restaurants
 
 const searchRestaurants = async (
     keyword
@@ -449,6 +466,309 @@ const searchRestaurants = async (
         .lean();
 };
 
+// Search Restaurants from Geoapify
+
+const searchExternalRestaurants = async ({
+    destinationId,
+    limit = 20,
+}) => {
+    const destination =
+        await Destination.findById(
+            destinationId
+        ).select(
+            "name city country location"
+        );
+
+    if (!destination) {
+        throw new ApiError(
+            404,
+            "Destination not found."
+        );
+    }
+
+    const coordinates =
+        destination.location?.coordinates;
+
+    if (
+        !Array.isArray(coordinates) ||
+        coordinates.length !== 2
+    ) {
+        throw new ApiError(
+            400,
+            "Destination coordinates are not available."
+        );
+    }
+
+    const [
+        longitude,
+        latitude,
+    ] = coordinates;
+
+    try {
+        const response =
+            await geoapifyClient.get(
+                "/v2/places",
+                {
+                    params: {
+                        categories:
+                            "catering.restaurant",
+
+                        filter:
+                            `circle:${longitude},${latitude},10000`,
+
+                        limit: Math.min(
+                            Number(limit) || 20,
+                            50
+                        ),
+
+                        lang: "en",
+
+                        apiKey:
+                            GEOAPIFY_API_KEY,
+                    },
+                }
+            );
+
+        const features =
+            Array.isArray(
+                response.data?.features
+            )
+                ? response.data.features
+                : [];
+
+        return features
+            .map((feature) => {
+                const properties =
+                    feature?.properties || {};
+
+                const [
+                    lon,
+                    lat,
+                ] =
+                    feature?.geometry
+                        ?.coordinates || [];
+
+                if (
+                    !Number.isFinite(
+                        Number(lon)
+                    ) ||
+                    !Number.isFinite(
+                        Number(lat)
+                    )
+                ) {
+                    return null;
+                }
+
+                return {
+                    geoapifyPlaceId:
+                        properties.place_id ||
+                        null,
+
+                    name:
+                        properties.name ||
+                        properties.address_line1 ||
+                        "Restaurant",
+
+                    description:
+                        properties.address_line2 ||
+                        "",
+
+                    destination:
+                        destination._id,
+
+                    address:
+                        properties.formatted ||
+                        "",
+
+                    city:
+                        properties.city ||
+                        destination.city,
+
+                    state:
+                        properties.state ||
+                        "",
+
+                    country:
+                        properties.country ||
+                        destination.country,
+
+                    location: {
+                        type: "Point",
+                        coordinates: [
+                            Number(lon),
+                            Number(lat),
+                        ],
+                    },
+
+                    cuisine:
+                        properties.catering
+                            ?.cuisine
+                            ? [
+                                  properties
+                                      .catering
+                                      .cuisine,
+                              ]
+                            : [],
+
+                    averageCostForTwo: 0,
+
+                    currency: "INR",
+
+                    averageRating:
+                        Number(
+                            properties
+                                .catering
+                                ?.stars
+                        ) || 0,
+
+                    reviewCount: 0,
+
+                    amenities: [],
+
+                    dietaryOptions: [],
+
+                    tableReservation:
+                        properties
+                            .catering
+                            ?.reservation ===
+                        "required",
+
+                    takeawayAvailable: false,
+
+                    deliveryAvailable: false,
+
+                    phone:
+                        properties.contact
+                            ?.phone ||
+                        "",
+
+                    email:
+                        properties.contact
+                            ?.email ||
+                        "",
+
+                    website:
+                        properties.website ||
+                        properties.contact
+                            ?.website ||
+                        "",
+
+                    isFeatured: false,
+
+                    isActive: true,
+                };
+            })
+            .filter(Boolean);
+
+    } catch (error) {
+        console.error(
+            "Geoapify restaurant search error:",
+            error.response?.data ||
+                error.message
+        );
+
+        throw new ApiError(
+            error.response?.status ||
+                502,
+            "Unable to fetch restaurants from Geoapify."
+        );
+    }
+};
+
+const saveExternalRestaurant = async ({
+    restaurantData,
+}) => {
+    const {
+        geoapifyPlaceId,
+        destination,
+        name,
+        description = "",
+        address = "",
+        city = "",
+        state = "",
+        country = "",
+        location,
+        cuisine = [],
+        phone = "",
+        email = "",
+        website = "",
+    } = restaurantData;
+
+    if (!geoapifyPlaceId) {
+        throw new ApiError(
+            400,
+            "Geoapify place ID is required."
+        );
+    }
+
+    if (!destination) {
+        throw new ApiError(
+            400,
+            "Destination is required."
+        );
+    }
+
+    const destinationExists =
+        await Destination.exists({
+            _id: destination,
+            isActive: true,
+        });
+
+    if (!destinationExists) {
+        throw new ApiError(
+            404,
+            "Destination not found."
+        );
+    }
+
+    const existing =
+        await Restaurant.findOne({
+            geoapifyPlaceId,
+        });
+
+    if (existing) {
+        return existing;
+    }
+
+    const slug = generateSlug(
+        name,
+        city || "",
+        country || ""
+    );
+
+    const restaurant =
+        await Restaurant.create({
+            name,
+            slug,
+            description,
+            destination,
+            address,
+            city,
+            state,
+            country,
+            location,
+            cuisine,
+            phone,
+            email,
+            website,
+            averageCostForTwo: 0,
+            currency: "INR",
+            averageRating: 0,
+            reviewCount: 0,
+            amenities: [],
+            dietaryOptions: [],
+            tableReservation: false,
+            takeawayAvailable: false,
+            deliveryAvailable: false,
+            isFeatured: false,
+            isActive: true,
+        });
+
+    return restaurant;
+};
+
+// Filter Restaurants
+
 const filterRestaurants = async ({
     destination,
     city,
@@ -463,6 +783,8 @@ const filterRestaurants = async ({
     const query = {
         isActive: true,
     };
+
+    // Filters
     
     if (destination) {
         query.destination =
@@ -535,6 +857,8 @@ const filterRestaurants = async ({
         .lean();
 };
 
+// Update Restaurant
+
 const updateRestaurant = async ({
     restaurantId,
     restaurantData,
@@ -563,6 +887,8 @@ const updateRestaurant = async ({
             "Restaurant not found."
         );
     }
+
+    // Verify Destination (if changed)
     
     if (restaurantData.destination) {
         const destination =
@@ -588,6 +914,7 @@ const updateRestaurant = async ({
     let uploadedGalleryImages = [];
 
     try {
+        // Upload New Cover Image
         
         if (coverImage) {
             const response =
@@ -615,6 +942,8 @@ const updateRestaurant = async ({
                 uploadedCoverImage;
         }
 
+        // Upload New Gallery Images
+
         if (galleryImages.length > 0) {
             uploadedGalleryImages =
                 await uploadGalleryImages(
@@ -624,6 +953,8 @@ const updateRestaurant = async ({
             restaurant.galleryImages =
                 uploadedGalleryImages;
         }
+
+        // Update Remaining Fields
         
         Object.entries(
             restaurantData
@@ -638,6 +969,8 @@ const updateRestaurant = async ({
                 }
             }
         );
+
+        // Regenerate Slug
         
         if (
             restaurantData.name ||
@@ -658,6 +991,8 @@ const updateRestaurant = async ({
         }
 
         await restaurant.save();
+
+        // Delete Old Cover Image
         
         if (
             coverImage &&
@@ -667,6 +1002,8 @@ const updateRestaurant = async ({
                 oldCoverImage.publicId
             );
         }
+
+        // Delete Old Gallery Images
         
         if (
             galleryImages.length > 0
@@ -680,6 +1017,7 @@ const updateRestaurant = async ({
     }
 
     catch (error) {
+        // Rollback Uploaded Cover
         
         if (
             uploadedCoverImage?.publicId
@@ -688,6 +1026,8 @@ const updateRestaurant = async ({
                 uploadedCoverImage.publicId
             );
         }
+
+        // Rollback Uploaded Gallery
         
         await deleteGalleryImages(
             uploadedGalleryImages
@@ -696,6 +1036,8 @@ const updateRestaurant = async ({
         throw error;
     }
 };
+
+// Delete Restaurant
 
 const deleteRestaurant = async (
     restaurantId
@@ -745,6 +1087,8 @@ export const restaurantService = {
     getAllRestaurants,
     getRestaurantById,
     searchRestaurants,
+    searchExternalRestaurants,
+    saveExternalRestaurant,
     filterRestaurants,
     updateRestaurant,
     deleteRestaurant,

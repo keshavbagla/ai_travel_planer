@@ -8,6 +8,7 @@ import {
     deleteDestination,
     searchDestinations,
     filterDestinations,
+    saveExternalDestination,
 } from "../controllers/destination.controller.js";
 
 import { verifyJWT } from "../middlewares/auth.middleware.js";
@@ -37,6 +38,15 @@ router.get(
     "/:destinationId",
     getDestinationById
 );
+
+// Protected Routes
+
+router.post(
+    "/select",
+    verifyJWT,
+    saveExternalDestination
+);
+
 router.post(
     "/",
     verifyJWT,

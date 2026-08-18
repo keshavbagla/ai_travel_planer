@@ -111,6 +111,55 @@ const searchActivities = asyncHandler(async (req, res) => {
     );
 });
 
+
+const searchExternalActivities =
+    asyncHandler(async (req, res) => {
+        const {
+            destinationId,
+            category,
+            limit = 20,
+        } = req.query;
+
+        if (!destinationId) {
+            throw new ApiError(
+                400,
+                "Destination ID is required."
+            );
+        }
+
+        const activities =
+            await activityService.searchExternalActivities({
+                destinationId,
+                category,
+                limit,
+            });
+
+        return res.status(200).json(
+            new ApiResponse(
+                200,
+                activities,
+                "Activities fetched successfully from external API."
+            )
+        );
+});
+
+const saveExternalActivity =
+    asyncHandler(async (req, res) => {
+        const activity =
+            await activityService
+                .saveExternalActivity({
+                    activityData: req.body,
+                });
+
+        return res.status(200).json(
+            new ApiResponse(
+                200,
+                activity,
+                "Activity selected successfully."
+            )
+        );
+});
+
 // Filter Activities
 
 const filterActivities = asyncHandler(async (req, res) => {
@@ -215,6 +264,8 @@ export {
     getAllActivities,
     getActivityById,
     searchActivities,
+    searchExternalActivities,
+    saveExternalActivity,
     filterActivities,
     updateActivity,
     deleteActivity,

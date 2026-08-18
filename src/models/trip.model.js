@@ -1,5 +1,7 @@
 import mongoose, { Schema } from "mongoose";
 
+// Travelers Schema
+
 const travelersSchema = new Schema(
     {
         adults: {
@@ -24,6 +26,8 @@ const travelersSchema = new Schema(
         _id: false,
     }
 );
+
+// Budget Schema
 
 const budgetSchema = new Schema(
     {
@@ -58,6 +62,8 @@ const budgetSchema = new Schema(
         _id: false,
     }
 );
+
+// Preferences Schema
 
 const preferencesSchema = new Schema(
     {
@@ -95,6 +101,8 @@ const preferencesSchema = new Schema(
         _id: false,
     }
 );
+
+// Flight Schema
 
 const selectedFlightSchema = new Schema(
     {
@@ -149,6 +157,8 @@ const selectedFlightSchema = new Schema(
         _id: false,
     }
 );
+
+// Itinerary Item
 
 const itineraryItemSchema = new Schema(
   {
@@ -221,8 +231,11 @@ const itineraryDaySchema = new Schema(
   }
 );
 
+// Trip Schema
+
 const tripSchema = new Schema(
   {
+    // Basic Information
 
     tripName: {
       type: String,
@@ -244,18 +257,18 @@ const tripSchema = new Schema(
       trim: true,
     },
 
+    // References
+
     user: {
       type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
-      index: true,
     },
     
     destination: {
       type: Schema.Types.ObjectId,
       ref: "Destination",
       required: true,
-      index: true,
     },
 
     hotel: {
@@ -278,6 +291,8 @@ const tripSchema = new Schema(
       },
     ],
 
+    // Tavel Dates
+
     startDate: {
       type: Date,
       required: true,
@@ -294,27 +309,40 @@ const tripSchema = new Schema(
       min: 1,
     },
 
+    // Travelers
+
     travelers: {
       type: travelersSchema,
       default: () => ({}),
+      required: true,
     },
+
+    // Budget
 
     budget: {
       type: budgetSchema,
       default: () => ({}),
     },
 
+    // Preferences
+
     preferences: {
       type: preferencesSchema,
       default: () => ({}),
     },
+
+    // Selected Flight
 
     selectedFlight: {
       type: selectedFlightSchema,
       default: null,
     },
 
+    // Day-wise Itinerary
+
     itinerary: [itineraryDaySchema,],
+
+    // AI Information
 
     isAIGenerated: {
       type: Boolean,
@@ -330,6 +358,8 @@ const tripSchema = new Schema(
       type: String,
       default: "",
     },
+
+    // Status
 
     status: {
       type: String,
@@ -383,6 +413,8 @@ const tripSchema = new Schema(
   }
 );
 
+// Indexes
+
 tripSchema.index({
     user: 1,
 });
@@ -425,10 +457,14 @@ tripSchema.pre("save", function () {
 tripSchema.virtual(
     "totalTravelers"
 ).get(function () {
+    if (!this.travelers) {
+        return 0;
+    }
+
     return (
-        this.travelers.adults +
-        this.travelers.children +
-        this.travelers.infants
+        (this.travelers.adults || 0) +
+        (this.travelers.children || 0) +
+        (this.travelers.infants || 0)
     );
 });
 

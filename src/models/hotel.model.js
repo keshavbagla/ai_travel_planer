@@ -1,5 +1,6 @@
 import mongoose, { Schema } from "mongoose";
 
+
 const imageSchema = new Schema(
     {
         url: {
@@ -42,6 +43,7 @@ const roomTypeSchema = new Schema(
         maxGuests: {
             type: Number,
             default: 2,
+            min: 1,
         },
 
         pricePerNight: {
@@ -62,9 +64,268 @@ const roomTypeSchema = new Schema(
     }
 );
 
+
+const hotelBookingSchema = new Schema(
+    {
+        user: {
+            type: Schema.Types.ObjectId,
+            ref: "User",
+            required: true,
+        },
+
+        provider: {
+            type: String,
+            enum: [
+                "liteapi",
+                "manual",
+            ],
+            default: "liteapi",
+        },
+
+        offerId: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+
+        prebookId: {
+            type: String,
+            default: "",
+            trim: true,
+        },
+
+        providerBookingId: {
+            type: String,
+            default: "",
+            trim: true,
+        },
+
+        clientReference: {
+            type: String,
+            default: "",
+            trim: true,
+        },
+
+        checkIn: {
+            type: Date,
+            required: true,
+        },
+
+        checkOut: {
+            type: Date,
+            required: true,
+        },
+
+        holder: {
+            firstName: {
+                type: String,
+                required: true,
+                trim: true,
+            },
+
+            lastName: {
+                type: String,
+                required: true,
+                trim: true,
+            },
+
+            email: {
+                type: String,
+                required: true,
+                trim: true,
+                lowercase: true,
+            },
+
+            phone: {
+                type: String,
+                default: "",
+                trim: true,
+            },
+        },
+
+
+        guests: [
+            {
+                firstName: {
+                    type: String,
+                    required: true,
+                    trim: true,
+                },
+
+                lastName: {
+                    type: String,
+                    required: true,
+                    trim: true,
+                },
+
+                email: {
+                    type: String,
+                    default: "",
+                    trim: true,
+                    lowercase: true,
+                },
+
+                phone: {
+                    type: String,
+                    default: "",
+                    trim: true,
+                },
+
+                type: {
+                    type: String,
+                    enum: [
+                        "adult",
+                        "child",
+                    ],
+                    default: "adult",
+                },
+
+                age: {
+                    type: Number,
+                    min: 0,
+                },
+
+                remarks: {
+                    type: String,
+                    default: "",
+                    trim: true,
+                },
+            },
+        ],
+
+
+        roomName: {
+            type: String,
+            default: "",
+            trim: true,
+        },
+
+        roomCount: {
+            type: Number,
+            default: 1,
+            min: 1,
+        },
+
+
+        amount: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
+
+        currency: {
+            type: String,
+            default: "USD",
+            uppercase: true,
+            trim: true,
+        },
+
+
+        payment: {
+            status: {
+                type: String,
+
+                enum: [
+                    "PENDING",
+                    "AUTHORIZED",
+                    "PAID",
+                    "FAILED",
+                    "REFUNDED",
+                ],
+
+                default: "PENDING",
+            },
+
+            method: {
+                type: String,
+                default: "",
+                trim: true,
+            },
+
+            transactionId: {
+                type: String,
+                default: "",
+                trim: true,
+            },
+        },
+
+
+        status: {
+            type: String,
+
+            enum: [
+                "PREBOOKED",
+                "PENDING",
+                "CONFIRMED",
+                "CANCELLED",
+                "FAILED",
+            ],
+
+            default: "PREBOOKED",
+        },
+
+        cancellation: {
+            status: {
+                type: String,
+
+                enum: [
+                    "NOT_CANCELLED",
+                    "REQUESTED",
+                    "CANCELLED",
+                    "FAILED",
+                ],
+
+                default: "NOT_CANCELLED",
+            },
+
+            cancelledAt: {
+                type: Date,
+                default: null,
+            },
+
+            reason: {
+                type: String,
+                default: "",
+                trim: true,
+            },
+
+            refundAmount: {
+                type: Number,
+                default: 0,
+                min: 0,
+            },
+
+            refundCurrency: {
+                type: String,
+                default: "USD",
+                uppercase: true,
+                trim: true,
+            },
+        },
+
+        prebookResponse: {
+            type: Schema.Types.Mixed,
+            default: null,
+        },
+
+        bookingResponse: {
+            type: Schema.Types.Mixed,
+            default: null,
+        },
+
+        cancellationResponse: {
+            type: Schema.Types.Mixed,
+            default: null,
+        },
+    },
+    {
+        timestamps: true,
+    }
+);
+
 const hotelSchema = new Schema(
     {
-      
+
         name: {
             type: String,
             required: true,
@@ -90,11 +351,7 @@ const hotelSchema = new Schema(
             type: Schema.Types.ObjectId,
             ref: "Destination",
             required: true,
-            index: true,
         },
-
-        // Address
-
         address: {
             type: String,
             required: true,
@@ -126,13 +383,15 @@ const hotelSchema = new Schema(
             },
 
             coordinates: {
-                type: [Number], 
+                type: [Number],
                 required: true,
             },
         },
 
+
         hotelType: {
             type: String,
+
             enum: [
                 "Hotel",
                 "Resort",
@@ -142,6 +401,7 @@ const hotelSchema = new Schema(
                 "Guest House",
                 "Homestay",
             ],
+
             default: "Hotel",
         },
 
@@ -162,6 +422,7 @@ const hotelSchema = new Schema(
         reviewCount: {
             type: Number,
             default: 0,
+            min: 0,
         },
 
         pricePerNight: {
@@ -173,6 +434,8 @@ const hotelSchema = new Schema(
         currency: {
             type: String,
             default: "INR",
+            uppercase: true,
+            trim: true,
         },
 
         amenities: [
@@ -182,9 +445,11 @@ const hotelSchema = new Schema(
             },
         ],
 
-        roomTypes: [roomTypeSchema],
 
-        // Policies
+        roomTypes: [
+            roomTypeSchema,
+        ],
+
 
         checkInTime: {
             type: String,
@@ -211,7 +476,6 @@ const hotelSchema = new Schema(
             default: false,
         },
 
-        // Contact
 
         phone: {
             type: String,
@@ -232,35 +496,37 @@ const hotelSchema = new Schema(
             trim: true,
         },
 
-        // Images
 
         coverImage: {
             type: imageSchema,
             default: null,
         },
 
-        galleryImages: [imageSchema],
+        galleryImages: [
+            imageSchema,
+        ],
 
 
         statistics: {
+
             totalBookings: {
                 type: Number,
                 default: 0,
+                min: 0,
             },
 
             totalViews: {
                 type: Number,
                 default: 0,
+                min: 0,
             },
 
             wishlistCount: {
                 type: Number,
                 default: 0,
+                min: 0,
             },
         },
-
-        // AI
-
         popularityScore: {
             type: Number,
             default: 0,
@@ -280,11 +546,17 @@ const hotelSchema = new Schema(
             type: Boolean,
             default: true,
         },
+
+        bookings: [
+            hotelBookingSchema,
+        ],
     },
+
     {
         timestamps: true,
     }
 );
+
 
 hotelSchema.index({
     location: "2dsphere",
@@ -293,6 +565,7 @@ hotelSchema.index({
 hotelSchema.index({
     destination: 1,
 });
+
 
 hotelSchema.index({
     country: 1,
@@ -316,16 +589,24 @@ hotelSchema.index({
 });
 
 
-hotelSchema.set("toJSON", {
-    versionKey: false,
-});
-
-hotelSchema.set("toObject", {
-    versionKey: false,
-});
-
-
-export const Hotel = mongoose.model(
-    "Hotel",
-    hotelSchema
+hotelSchema.set(
+    "toJSON",
+    {
+        versionKey: false,
+    }
 );
+
+
+hotelSchema.set(
+    "toObject",
+    {
+        versionKey: false,
+    }
+);
+
+
+export const Hotel =
+    mongoose.model(
+        "Hotel",
+        hotelSchema
+    );

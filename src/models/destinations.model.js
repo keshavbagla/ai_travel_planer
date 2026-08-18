@@ -11,9 +11,10 @@ const airportSchema = new Schema(
   }
 );
 
+// Destination Schema
+
 const destinationSchema = new Schema(
   {
-
     name: {
       type: String,
       required: true,
@@ -52,13 +53,16 @@ const destinationSchema = new Schema(
       unique: true,
       lowercase: true,
       trim: true,
-      index: true
     },
+
+    // Description
 
     description: {
       type: String,
       trim: true,
     },
+
+    // Destination Categories
 
     destinationType: [
       {
@@ -113,6 +117,24 @@ const destinationSchema = new Schema(
       default: ""
     },
 
+    // Geo Location
+    
+    geoapifyPlaceId: {
+        type: String,
+        trim: true,
+    },
+
+    countryCode: {
+        type: String,
+        trim: true,
+        uppercase: true,
+    },
+
+    placeType: {
+        type: String,
+        trim: true,
+    },
+
     location: {
       type: {
         type: String,
@@ -128,6 +150,8 @@ const destinationSchema = new Schema(
     timezone: String,
     nearbyAirports: [airportSchema],
 
+    // Climate
+
     climate: {
       averageTemperature: Number,
       summerSeason: String,
@@ -139,6 +163,8 @@ const destinationSchema = new Schema(
     bestMonths: [
       String
     ],
+
+    // Budget
     
     averageDailyBudget: {
       budget: Number,
@@ -150,6 +176,9 @@ const destinationSchema = new Schema(
       type: String,
       default: "INR"
     },
+
+    // Activities
+
     popularActivities: [
       String
     ],
@@ -157,6 +186,8 @@ const destinationSchema = new Schema(
     famousFor: [
       String
     ],
+
+    // Suitable For
   
     suitableFor: [
       {
@@ -185,6 +216,8 @@ const destinationSchema = new Schema(
         ]
       }
     ],
+
+    // Attractions
     
     activities: [
       {
@@ -192,6 +225,8 @@ const destinationSchema = new Schema(
         ref: "Activity"
       }
     ],    
+
+    // Restaurants
     
     restaurants: [
       {
@@ -200,6 +235,7 @@ const destinationSchema = new Schema(
       }
     ],
 
+    // Hotels
     
     hotels: [
       {
@@ -208,6 +244,7 @@ const destinationSchema = new Schema(
       }
     ],
 
+    // Transport
 
     transportation: {
       airportTransfer: Boolean,
@@ -215,6 +252,15 @@ const destinationSchema = new Schema(
       bus: Boolean,
       taxi: Boolean,
       bikeRental: Boolean
+    },
+
+    // Travel Information
+
+    primaryAirportIata: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      default: null,
     },
 
     visaRequired: {
@@ -257,6 +303,7 @@ const destinationSchema = new Schema(
       }
     ],
 
+    // AI Scores
 
     aiScores: {
       family: {
@@ -289,6 +336,8 @@ const destinationSchema = new Schema(
         default: 0
       }
     },
+
+    // Ratings
     
     averageRating: {
       type: Number,
@@ -301,6 +350,8 @@ const destinationSchema = new Schema(
       type: Number,
       default: 0
     },
+
+    // Images
     
     coverImage: {
       url: {
@@ -338,6 +389,8 @@ const destinationSchema = new Schema(
       }
     ],
     
+    // Status
+    
     isActive: {
       type: Boolean,
       default: true
@@ -348,9 +401,7 @@ const destinationSchema = new Schema(
   }
 );
 
-destinationSchema.index({
-    slug: 1
-});
+// Indexes
 
 destinationSchema.index({
     averageRating: -1
@@ -375,6 +426,10 @@ destinationSchema.index({
   averageRating: -1
 });
 
+destinationSchema.index({
+    geoapifyPlaceId: 1,
+});
+
 destinationSchema.set("toJSON", {
     versionKey: false,
 });
@@ -382,6 +437,8 @@ destinationSchema.set("toJSON", {
 destinationSchema.set("toObject", {
     versionKey: false,
 });
+
+// Model
 
 export const Destination = mongoose.model(
   "Destination",

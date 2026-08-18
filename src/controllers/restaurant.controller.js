@@ -111,6 +111,24 @@ const searchRestaurants = asyncHandler(async (req, res) => {
     );
 });
 
+
+const saveExternalRestaurant =
+    asyncHandler(async (req, res) => {
+        const restaurant =
+            await restaurantService
+                .saveExternalRestaurant({
+                    restaurantData: req.body,
+                });
+
+        return res.status(200).json(
+            new ApiResponse(
+                200,
+                restaurant,
+                "Restaurant selected successfully."
+            )
+        );
+});
+
 const filterRestaurants = asyncHandler(async (req, res) => {
     const restaurants =
         await restaurantService.filterRestaurants(

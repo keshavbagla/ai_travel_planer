@@ -8,6 +8,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { ApiError } from "../utils/ApiError.js";
 
+
 const parseJSONField = (value) => {
     if (typeof value !== "string") {
         return value;
@@ -59,6 +60,8 @@ const createTrip = asyncHandler(async (req, res) => {
     );
 });
 
+// Get All Trips
+
 const getAllTrips = asyncHandler(async (req, res) => {
     const trips =
         await tripService.getAllTrips({
@@ -74,6 +77,8 @@ const getAllTrips = asyncHandler(async (req, res) => {
         )
     );
 });
+
+// Get Trip By ID
 
 const getTripById = asyncHandler(async (req, res) => {
     const { tripId } = req.params;
@@ -96,6 +101,8 @@ const getTripById = asyncHandler(async (req, res) => {
     );
 });
 
+// Search Trips
+
 const searchTrips = asyncHandler(async (req, res) => {
     const trips =
         await tripService.searchTrips(
@@ -112,6 +119,8 @@ const searchTrips = asyncHandler(async (req, res) => {
     );
 });
 
+// Filter Trips
+
 const filterTrips = asyncHandler(async (req, res) => {
     const trips =
         await tripService.filterTrips({  
@@ -127,6 +136,8 @@ const filterTrips = asyncHandler(async (req, res) => {
         )
     );
 });
+
+// Update Trip
 
 const updateTrip = asyncHandler(async (req, res) => {
     if(req.body.travelers){
@@ -187,6 +198,8 @@ const updateTrip = asyncHandler(async (req, res) => {
         )
     );
 });
+
+// Delete Trip
 
 const deleteTrip = asyncHandler(async (req, res) => {
     const { tripId } = req.params;
