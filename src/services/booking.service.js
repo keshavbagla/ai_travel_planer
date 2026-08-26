@@ -3,8 +3,10 @@ import { User } from "../models/user.model.js";
 import { Trip } from "../models/trip.model.js";
 import { Hotel } from "../models/hotel.model.js";
 import { Activity } from "../models/activity.model.js";
+import { Traveler } from "../models/traveler.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { generateBookingReference } from "../utils/generateBookingReference.js";
+
 
 const populateBooking = (query) => {
     return query
@@ -17,12 +19,7 @@ const populateBooking = (query) => {
             "tripName slug startDate endDate status travelers"
         )
         .populate(
-            "hotel",
-            "name starRating pricePerNight coverImage"
-        )
-        .populate(
-            "activities",
-            "name category price coverImage"
+            "item"
         );
 };
 
@@ -54,10 +51,22 @@ const validateReferences = async (
         );
     }
 
-    if (bookingData.hotel) {
+    if (
+        !bookingData.item
+    ) {
+        throw new ApiError(
+            400,
+            "Booking item is required."
+        );
+    }
+
+    if (
+        bookingData.itemModel ===
+        "Hotel"
+    ) {
         const hotel =
             await Hotel.findById(
-                bookingData.hotel
+                bookingData.item
             );
 
         if (!hotel) {
@@ -69,24 +78,33 @@ const validateReferences = async (
     }
 
     if (
-        Array.isArray(
-            bookingData.activities
-        )
+        bookingData.itemModel ===
+        "Activity"
     ) {
-        const count =
-            await Activity.countDocuments({
-                _id: {
-                    $in: bookingData.activities,
-                },
-            });
+        const activity =
+            await Activity.findById(
+                bookingData.item
+            );
+
+        if (!activity) {
+            throw new ApiError(
+                404,
+                "Activity not found."
+            );
+        }
+    }
+
+    if (
+        bookingData.itemModel ===
+        "Flight"
+    ) {
 
         if (
-            count !==
-            bookingData.activities.length
+            !trip.selectedFlight
         ) {
             throw new ApiError(
                 404,
-                "One or more activities not found."
+                "Selected flight not found in trip."
             );
         }
     }
@@ -96,6 +114,7 @@ const createPassengerSnapshots = async ({
     travelerIds,
     user,
 }) => {
+
     if (
         !travelerIds ||
         travelerIds.length === 0
@@ -116,7 +135,9 @@ const createPassengerSnapshots = async ({
             _id: {
                 $in: uniqueTravelerIds,
             },
+
             user,
+
             isActive: true,
         });
 
@@ -163,29 +184,26 @@ const createPassengerSnapshots = async ({
                 traveler.passport
                     ? {
                         passportNumber:
-                            traveler
-                                .passport
+                            traveler.passport
                                 .passportNumber,
 
                         issueDate:
-                            traveler
-                                .passport
+                            traveler.passport
                                 .issueDate,
 
                         expiryDate:
-                            traveler
-                                .passport
+                            traveler.passport
                                 .expiryDate,
 
                         issuingCountry:
-                            traveler
-                                .passport
+                            traveler.passport
                                 .issuingCountry,
                     }
                     : null,
         })
     );
 };
+
 
 const createBooking = async (
     bookingData
@@ -195,29 +213,53 @@ const createBooking = async (
         bookingData
     );
 
+    const passengers =
+        await createPassengerSnapshots({
+            travelerIds:
+                bookingData.travelerIds,
+            user:
+                bookingData.user,
+        });
+
     let bookingReference;
+
     do {
-        bookingReference = generateBookingReference();
-    } 
-    while (
+        bookingReference =
+            generateBookingReference();
+
+    } while (
         await Booking.exists({
             bookingReference,
         })
     );
 
-    const booking = await Booking.create({
-        ...bookingData,
-        bookingReference,
-    });
+    const {
+        travelerIds,
+        ...bookingFields
+    } = bookingData;
 
-    const populatedBooking = await populateBooking(
-        Booking.findById(booking._id)
+
+    const booking =
+        await Booking.create({
+            ...bookingFields,
+
+            metadata: {
+                ...(bookingFields.metadata || {}),
+
+                passengerSnapshots:
+                    passengers,
+            },
+
+            status:
+                bookingFields.status ||
+                "Selected",
+        });
+
+    return await populateBooking(
+        Booking.findById(
+            booking._id
+        )
     );
-
-    console.log("Booking Guests:", populatedBooking.guests);
-    console.log("Booking:", populatedBooking);
-
-    return populatedBooking;
 };
 
 const getAllBookings = async ({
@@ -228,16 +270,17 @@ const getAllBookings = async ({
     page = Number(page);
     limit = Number(limit);
 
-    const skip = (page - 1) * limit;
+    const skip =
+        (page - 1) * limit;
 
     const [
         bookings,
         total,
     ] = await Promise.all([
+
         populateBooking(
             Booking.find({
                 user,
-                isActive: true,
             })
                 .sort({
                     createdAt: -1,
@@ -248,19 +291,21 @@ const getAllBookings = async ({
 
         Booking.countDocuments({
             user,
-            isActive: true,
         }),
     ]);
 
     return {
         bookings,
+
         pagination: {
             page,
             limit,
             total,
-            totalPages: Math.ceil(
-                total / limit
-            ),
+
+            totalPages:
+                Math.ceil(
+                    total / limit
+                ),
         },
     };
 };
@@ -274,7 +319,6 @@ const getBookingById = async ({
             Booking.findOne({
                 _id: bookingId,
                 user,
-                isActive: true,
             })
         );
 
@@ -299,16 +343,38 @@ const searchBookings = async (
     return await populateBooking(
         Booking.find({
             user,
-            isActive: true,
+
             $or: [
                 {
-                    bookingReference: {
+                    provider: {
                         $regex: keyword,
                         $options: "i",
                     },
                 },
+
                 {
-                    bookingType: {
+                    type: {
+                        $regex: keyword,
+                        $options: "i",
+                    },
+                },
+
+                {
+                    status: {
+                        $regex: keyword,
+                        $options: "i",
+                    },
+                },
+
+                {
+                    externalItemId: {
+                        $regex: keyword,
+                        $options: "i",
+                    },
+                },
+
+                {
+                    providerBookingId: {
                         $regex: keyword,
                         $options: "i",
                     },
@@ -324,56 +390,49 @@ const searchBookings = async (
 
 const filterBookings = async ({
     user,
-    bookingStatus,
-    paymentStatus,
-    bookingType,
-    isCancelled,
+    status,
+    type,
+    provider,
+    bookingMode,
 } = {}) => {
     const query = {
         user,
-        isActive: true,
     };
 
-    if (bookingStatus) {
-        query.bookingStatus =
-            bookingStatus;
+    if (status) {
+        query.status = status;
     }
 
-    if (paymentStatus) {
-        query.paymentStatus =
-            paymentStatus;
+    if (type) {
+        query.type = type;
     }
 
-    if (bookingType) {
-        query.bookingType =
-            bookingType;
+    if (provider) {
+        query.provider = provider;
     }
 
-    if (
-        isCancelled !==
-        undefined
-    ) {
-        query.isCancelled =
-            isCancelled;
+    if (bookingMode) {
+        query.bookingMode =
+            bookingMode;
     }
 
     return await populateBooking(
-        Booking.find(query).sort({
-            createdAt: -1,
-        })
+        Booking.find(query)
+            .sort({
+                createdAt: -1,
+            })
     );
 };
 
 const updateBooking = async ({
     bookingId,
     bookingData,
-    user
+    user,
 }) => {
     const booking =
         await Booking.findOne({
             _id: bookingId,
             user,
-            isActive: true,
         });
 
     if (!booking) {
@@ -383,32 +442,158 @@ const updateBooking = async ({
         );
     }
 
-    // Validate References
-
     if (
         bookingData.trip ||
-        bookingData.hotel ||
-        bookingData.activities
+        bookingData.item ||
+        bookingData.itemModel
     ) {
         await validateReferences({
-            user: booking.user,
-            trip: bookingData.trip || booking.trip,
-            hotel: bookingData.hotel || booking.hotel,
-            activities: bookingData.activities || booking.activities,
+
+            user:
+                booking.user,
+
+            trip:
+                bookingData.trip ||
+                booking.trip,
+
+            item:
+                bookingData.item ||
+                booking.item,
+
+            itemModel:
+                bookingData.itemModel ||
+                booking.itemModel,
         });
     }
 
     Object.entries(
         bookingData
-    ).forEach(([key, value]) => {
-        if (
-            value !== undefined &&
-            value !== null
-        ) {
-            booking[key] = value;
-        }
+    ).forEach(
+        ([key, value]) => {
 
-    });
+            if (
+                value !== undefined &&
+                value !== null
+            ) {
+                booking[key] =
+                    value;
+            }
+        }
+    );
+
+    await booking.save();
+
+    return await populateBooking(
+        Booking.findById(
+            booking._id
+        )
+    );
+};
+
+const initiateExternalBooking = async ({
+    bookingId,
+    user,
+}) => {
+    const booking =
+        await Booking.findOne({
+            _id: bookingId,
+            user,
+        });
+
+    if (!booking) {
+        throw new ApiError(
+            404,
+            "Booking not found."
+        );
+    }
+
+    if (
+        booking.bookingMode !==
+        "ExternalRedirect"
+    ) {
+        throw new ApiError(
+            400,
+            "This booking does not use external redirect."
+        );
+    }
+
+    if (
+        !booking.bookingUrl
+    ) {
+        throw new ApiError(
+            400,
+            "Booking URL is not available."
+        );
+    }
+
+    if (
+        booking.status ===
+        "Cancelled"
+    ) {
+        throw new ApiError(
+            400,
+            "Cancelled booking cannot be initiated."
+        );
+    }
+
+    booking.status =
+        "BookingInitiated";
+
+    await booking.save();
+
+    booking.status =
+        "Redirected";
+
+    booking.redirectedAt =
+        new Date();
+
+    await booking.save();
+
+    return await populateBooking(
+        Booking.findById(
+            booking._id
+        )
+    );
+};
+
+const confirmBooking = async ({
+    bookingId,
+    user,
+    providerBookingId,
+}) => {
+    const booking =
+        await Booking.findOne({
+            _id: bookingId,
+            user,
+        });
+
+    if (!booking) {
+        throw new ApiError(
+            404,
+            "Booking not found."
+        );
+    }
+
+    if (
+        booking.status !==
+            "Redirected" &&
+        booking.status !==
+            "BookingInitiated"
+    ) {
+        throw new ApiError(
+            400,
+            "Booking cannot be confirmed from its current status."
+        );
+    }
+
+    booking.status =
+        "Confirmed";
+
+    booking.providerBookingId =
+        providerBookingId || "";
+
+    booking.confirmedAt =
+        new Date();
 
     await booking.save();
 
@@ -422,13 +607,11 @@ const updateBooking = async ({
 const cancelBooking = async ({
     bookingId,
     user,
-    cancellationReason
 }) => {
     const booking =
         await Booking.findOne({
             _id: bookingId,
             user,
-            isActive: true,
         });
 
     if (!booking) {
@@ -438,15 +621,20 @@ const cancelBooking = async ({
         );
     }
 
-    booking.bookingStatus =
+    if (
+        booking.status ===
+        "Cancelled"
+    ) {
+        throw new ApiError(
+            400,
+            "Booking is already cancelled."
+        );
+    }
+
+    booking.status =
         "Cancelled";
 
-    booking.isCancelled = true;
-
-    booking.cancellationReason =
-        cancellationReason;
-
-    booking.cancellationDate =
+    booking.cancelledAt =
         new Date();
 
     await booking.save();
@@ -458,17 +646,14 @@ const cancelBooking = async ({
     );
 };
 
-// Delete Booking
-
 const deleteBooking = async ({
     bookingId,
-    user
+    user,
 }) => {
     const booking =
         await Booking.findOne({
             _id: bookingId,
             user,
-            isActive: true,
         });
 
     if (!booking) {
@@ -478,10 +663,16 @@ const deleteBooking = async ({
         );
     }
 
-    booking.isActive = false;
+    booking.metadata = {
+        ...(booking.metadata || {}),
+        isDeleted: true,
+        deletedAt:
+            new Date(),
+    };
 
     await booking.save();
 };
+
 
 export const bookingService = {
     createBooking,
@@ -490,6 +681,8 @@ export const bookingService = {
     searchBookings,
     filterBookings,
     updateBooking,
+    initiateExternalBooking,
+    confirmBooking,
     cancelBooking,
     deleteBooking,
 };

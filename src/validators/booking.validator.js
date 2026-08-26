@@ -1,21 +1,32 @@
 import mongoose from "mongoose";
 import { ApiError } from "../utils/ApiError.js";
 
-const validateCreateBooking = (
-    data
-) => {
+
+const validateCreateBooking = (data) => {
     const {
         user,
         trip,
-        hotel,
-        activities,
-        bookingType,
-        checkInDate,
-        checkOutDate,
-        guests,
-        totalAmount,
-        paymentMethod,
+
+        type,
+        item,
+        itemModel,
+
+        provider,
+        externalItemId,
+
+        bookingUrl,
+        bookingMode,
+
+        guestDetails,
+        travelers,
+
+        amount,
+        currency,
+
+        startDate,
+        endDate,
     } = data;
+
 
     if (!user) {
         throw new ApiError(
@@ -53,55 +64,19 @@ const validateCreateBooking = (
         );
     }
 
-    if (
-        hotel &&
-        !mongoose.Types.ObjectId.isValid(
-            hotel
-        )
-    ) {
+    if (!type) {
         throw new ApiError(
             400,
-            "Invalid hotel ID."
-        );
-    }
-
-    if (activities) {
-        if (
-            !Array.isArray(
-                activities
-            )
-        ) {
-            throw new ApiError(
-                400,
-                "Activities must be an array."
-            );
-        }
-
-        activities.forEach(
-            (id) => {
-                if (
-                    !mongoose.Types.ObjectId.isValid(
-                        id
-                    )
-                ) {
-                    throw new ApiError(
-                        400,
-                        "Invalid activity ID."
-                    );
-                }
-            }
+            "Booking type is required."
         );
     }
 
     if (
-        bookingType &&
         ![
-            "Trip",
+            "Flight",
             "Hotel",
             "Activity",
-        ].includes(
-            bookingType
-        )
+        ].includes(type)
     ) {
         throw new ApiError(
             400,
@@ -109,112 +84,248 @@ const validateCreateBooking = (
         );
     }
 
-    if (!checkInDate) {
-        throw new ApiError(
-            400,
-            "Check-in date is required."
-        );
-    }
+    // Item
 
-    if (!checkOutDate) {
+    if (!item) {
         throw new ApiError(
             400,
-            "Check-out date is required."
+            "Booking item is required."
         );
     }
 
     if (
-        new Date(
-            checkInDate
-        ) >
-        new Date(
-            checkOutDate
+        !mongoose.Types.ObjectId.isValid(
+            item
         )
     ) {
         throw new ApiError(
             400,
-            "Check-out date must be after check-in date."
+            "Invalid booking item ID."
         );
     }
 
-    if (!guests) {
+    // Item Model
+
+    if (!itemModel) {
         throw new ApiError(
             400,
-            "Guest details are required."
+            "Item model is required."
         );
     }
 
     if (
-        guests.adults ===
-            undefined ||
-        guests.adults < 1
-    ) {
-        throw new ApiError(
-            400,
-            "At least one adult is required."
-        );
-    }
-
-    if (
-        guests.children &&
-        guests.children < 0
-    ) {
-        throw new ApiError(
-            400,
-            "Children count cannot be negative."
-        );
-    }
-
-    if (
-        guests.infants &&
-        guests.infants < 0
-    ) {
-        throw new ApiError(
-            400,
-            "Infants count cannot be negative."
-        );
-    }
-
-    if (
-        totalAmount ===
-        undefined
-    ) {
-        throw new ApiError(
-            400,
-            "Total amount is required."
-        );
-    }
-
-    if (totalAmount < 0) {
-        throw new ApiError(
-            400,
-            "Total amount cannot be negative."
-        );
-    }
-
-    if (
-        paymentMethod &&
         ![
-            "Card",
-            "UPI",
-            "Net Banking",
-            "Wallet",
-            "Cash",
-        ].includes(
-            paymentMethod
+            "Flight",
+            "Hotel",
+            "Activity",
+        ].includes(itemModel)
+    ) {
+        throw new ApiError(
+            400,
+            "Invalid item model."
+        );
+    }
+
+    // Type and Item Model must match
+
+    if (type !== itemModel) {
+        throw new ApiError(
+            400,
+            "Booking type and item model must match."
+        );
+    }
+
+    // Provider
+
+    if (!provider?.trim()) {
+        throw new ApiError(
+            400,
+            "Booking provider is required."
+        );
+    }
+
+    // External Item ID
+
+    if (
+        externalItemId !== undefined &&
+        typeof externalItemId !== "string"
+    ) {
+        throw new ApiError(
+            400,
+            "External item ID must be a string."
+        );
+    }
+
+    // Booking Mode
+
+    if (
+        bookingMode &&
+        ![
+            "ExternalRedirect",
+            "DirectAPI",
+        ].includes(bookingMode)
+    ) {
+        throw new ApiError(
+            400,
+            "Invalid booking mode."
+        );
+    }
+
+    // Booking URL
+
+    if (
+        bookingMode ===
+            "ExternalRedirect" &&
+        !bookingUrl?.trim()
+    ) {
+        throw new ApiError(
+            400,
+            "Booking URL is required for external redirect bookings."
+        );
+    }
+
+    if (
+        bookingUrl !== undefined &&
+        typeof bookingUrl !== "string"
+    ) {
+        throw new ApiError(
+            400,
+            "Booking URL must be a string."
+        );
+    }
+
+    // Guest Details
+
+    if (guestDetails) {
+        if (
+            typeof guestDetails !==
+            "object"
+        ) {
+            throw new ApiError(
+                400,
+                "Guest details must be an object."
+            );
+        }
+
+        if (
+            guestDetails.email &&
+            typeof guestDetails.email !==
+                "string"
+        ) {
+            throw new ApiError(
+                400,
+                "Guest email must be a string."
+            );
+        }
+    }
+
+    // Travelers
+
+    if (travelers) {
+
+        if (
+            travelers.adults !==
+                undefined &&
+            travelers.adults < 1
+        ) {
+            throw new ApiError(
+                400,
+                "At least one adult is required."
+            );
+        }
+
+        if (
+            travelers.children !==
+                undefined &&
+            travelers.children < 0
+        ) {
+            throw new ApiError(
+                400,
+                "Children count cannot be negative."
+            );
+        }
+
+        if (
+            travelers.infants !==
+                undefined &&
+            travelers.infants < 0
+        ) {
+            throw new ApiError(
+                400,
+                "Infants count cannot be negative."
+            );
+        }
+    }
+
+    // Amount
+
+    if (
+        amount !== undefined &&
+        amount < 0
+    ) {
+        throw new ApiError(
+            400,
+            "Amount cannot be negative."
+        );
+    }
+
+    // Currency
+
+    if (
+        currency !== undefined &&
+        typeof currency !== "string"
+    ) {
+        throw new ApiError(
+            400,
+            "Currency must be a string."
+        );
+    }
+
+    // Dates
+
+    if (
+        startDate &&
+        isNaN(
+            new Date(startDate).getTime()
         )
     ) {
         throw new ApiError(
             400,
-            "Invalid payment method."
+            "Invalid start date."
+        );
+    }
+
+    if (
+        endDate &&
+        isNaN(
+            new Date(endDate).getTime()
+        )
+    ) {
+        throw new ApiError(
+            400,
+            "Invalid end date."
+        );
+    }
+
+    if (
+        startDate &&
+        endDate &&
+        new Date(startDate) >
+            new Date(endDate)
+    ) {
+        throw new ApiError(
+            400,
+            "End date must be after start date."
         );
     }
 };
 
-const validateUpdateBooking = (
-    data
-) => {
+// Update Booking Validation
+
+const validateUpdateBooking = (data) => {
+
     if (
+        !data ||
         !Object.keys(data).length
     ) {
         throw new ApiError(
@@ -222,6 +333,22 @@ const validateUpdateBooking = (
             "No update data provided."
         );
     }
+
+    // User
+
+    if (
+        data.user &&
+        !mongoose.Types.ObjectId.isValid(
+            data.user
+        )
+    ) {
+        throw new ApiError(
+            400,
+            "Invalid user ID."
+        );
+    }
+
+    // Trip
 
     if (
         data.trip &&
@@ -235,57 +362,15 @@ const validateUpdateBooking = (
         );
     }
 
-    if (
-        data.hotel &&
-        !mongoose.Types.ObjectId.isValid(
-            data.hotel
-        )
-    ) {
-        throw new ApiError(
-            400,
-            "Invalid hotel ID."
-        );
-    }
+    // Type
 
     if (
-        data.activities
-    ) {
-        if (
-            !Array.isArray(
-                data.activities
-            )
-        ) {
-            throw new ApiError(
-                400,
-                "Activities must be an array."
-            );
-        }
-
-        data.activities.forEach(
-            (id) => {
-                if (
-                    !mongoose.Types.ObjectId.isValid(
-                        id
-                    )
-                ) {
-                    throw new ApiError(
-                        400,
-                        "Invalid activity ID."
-                    );
-                }
-            }
-        );
-    }
-
-    if (
-        data.bookingType &&
+        data.type &&
         ![
-            "Trip",
+            "Flight",
             "Hotel",
             "Activity",
-        ].includes(
-            data.bookingType
-        )
+        ].includes(data.type)
     ) {
         throw new ApiError(
             400,
@@ -293,92 +378,114 @@ const validateUpdateBooking = (
         );
     }
 
+    // Item
+
     if (
-        data.paymentMethod &&
-        ![
-            "Card",
-            "UPI",
-            "Net Banking",
-            "Wallet",
-            "Cash",
-        ].includes(
-            data.paymentMethod
+        data.item &&
+        !mongoose.Types.ObjectId.isValid(
+            data.item
         )
     ) {
         throw new ApiError(
             400,
-            "Invalid payment method."
+            "Invalid booking item ID."
         );
     }
 
+    // Item Model
+
     if (
-        data.paymentStatus &&
+        data.itemModel &&
         ![
-            "Pending",
-            "Paid",
-            "Refunded",
-            "Failed",
+            "Flight",
+            "Hotel",
+            "Activity",
         ].includes(
-            data.paymentStatus
+            data.itemModel
         )
     ) {
         throw new ApiError(
             400,
-            "Invalid payment status."
+            "Invalid item model."
         );
     }
 
+    // Type and Item Model
+
     if (
-        data.bookingStatus &&
+        data.type &&
+        data.itemModel &&
+        data.type !==
+            data.itemModel
+    ) {
+        throw new ApiError(
+            400,
+            "Booking type and item model must match."
+        );
+    }
+
+    // Provider
+
+    if (
+        data.provider !== undefined &&
+        !data.provider?.trim()
+    ) {
+        throw new ApiError(
+            400,
+            "Provider cannot be empty."
+        );
+    }
+
+    // Booking Mode
+
+    if (
+        data.bookingMode &&
         ![
-            "Pending",
-            "Confirmed",
-            "Completed",
-            "Cancelled",
+            "ExternalRedirect",
+            "DirectAPI",
         ].includes(
-            data.bookingStatus
+            data.bookingMode
         )
     ) {
         throw new ApiError(
             400,
-            "Invalid booking status."
+            "Invalid booking mode."
         );
     }
 
+    // Booking URL
+
     if (
-        data.checkInDate &&
-        data.checkOutDate &&
-        new Date(
-            data.checkInDate
-        ) >
-            new Date(
-                data.checkOutDate
-            )
+        data.bookingUrl !== undefined &&
+        typeof data.bookingUrl !==
+            "string"
     ) {
         throw new ApiError(
             400,
-            "Check-out date must be after check-in date."
+            "Booking URL must be a string."
         );
     }
 
+    // Amount
+
     if (
-        data.totalAmount !==
-            undefined &&
-        data.totalAmount < 0
+        data.amount !== undefined &&
+        data.amount < 0
     ) {
         throw new ApiError(
             400,
-            "Total amount cannot be negative."
+            "Amount cannot be negative."
         );
     }
 
-    if (
-        data.guests
-    ) {
+    // Travelers
+
+    if (data.travelers) {
+
         if (
-            data.guests.adults !==
+            data.travelers.adults !==
                 undefined &&
-            data.guests.adults < 1
+            data.travelers.adults < 1
         ) {
             throw new ApiError(
                 400,
@@ -387,8 +494,9 @@ const validateUpdateBooking = (
         }
 
         if (
-            data.guests.children &&
-            data.guests.children < 0
+            data.travelers.children !==
+                undefined &&
+            data.travelers.children < 0
         ) {
             throw new ApiError(
                 400,
@@ -397,8 +505,9 @@ const validateUpdateBooking = (
         }
 
         if (
-            data.guests.infants &&
-            data.guests.infants < 0
+            data.travelers.infants !==
+                undefined &&
+            data.travelers.infants < 0
         ) {
             throw new ApiError(
                 400,
@@ -406,7 +515,72 @@ const validateUpdateBooking = (
             );
         }
     }
+
+    // Dates
+
+    if (
+        data.startDate &&
+        isNaN(
+            new Date(
+                data.startDate
+            ).getTime()
+        )
+    ) {
+        throw new ApiError(
+            400,
+            "Invalid start date."
+        );
+    }
+
+    if (
+        data.endDate &&
+        isNaN(
+            new Date(
+                data.endDate
+            ).getTime()
+        )
+    ) {
+        throw new ApiError(
+            400,
+            "Invalid end date."
+        );
+    }
+
+    if (
+        data.startDate &&
+        data.endDate &&
+        new Date(data.startDate) >
+            new Date(data.endDate)
+    ) {
+        throw new ApiError(
+            400,
+            "End date must be after start date."
+        );
+    }
+
+    // Status
+
+    if (
+        data.status &&
+        ![
+            "Selected",
+            "BookingInitiated",
+            "Redirected",
+            "Confirmed",
+            "Cancelled",
+            "Failed",
+        ].includes(
+            data.status
+        )
+    ) {
+        throw new ApiError(
+            400,
+            "Invalid booking status."
+        );
+    }
 };
+
+// Cancel Booking Validation
 
 const validateCancelBooking = (
     cancellationReason
@@ -421,9 +595,12 @@ const validateCancelBooking = (
     }
 };
 
+// Booking ID Validation
+
 const validateBookingId = (
     bookingId
 ) => {
+
     if (!bookingId) {
         throw new ApiError(
             400,
@@ -442,6 +619,8 @@ const validateBookingId = (
         );
     }
 };
+
+// Export
 
 export {
     validateCreateBooking,

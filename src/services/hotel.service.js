@@ -1,74 +1,240 @@
 import slugify from "slugify";
-import mongoose from "mongoose";
-
 import { Hotel } from "../models/hotel.model.js";
-import { Destination } from "../models/destinations.model.js";
+import axios from "axios";
+import { Destination } from "../models/destination.model.js";
 import { ApiError } from "../utils/ApiError.js";
-
 import {
     uploadOnCloudinary,
     deleteFromCloudinary,
 } from "../utils/cloudinary.js";
+import mongoose from "mongoose";
 
-import {
-    searchHotelsExternal,
-    searchHotelsByCoordinates,
-    getHotelFilter,
-    getHotelDetailsExternal,
-    getRoomAvailability,
-    getRoomList,
-    getRoomListWithAvailability,
-    getHotelPhotos,
+const stayingApiClient = axios.create({
+    baseURL:
+        process.env.STAYING_BASE_URL ||
+        "https://api.stayingapi.com",
 
-    liteApiPrebook,
-    liteApiBook,
-    liteApiGetBooking,
-    liteApiCancelBooking,
-} from "../integrations/hotel.integration.js";
+    headers: {
+        Authorization: `Bearer ${process.env.STAYING_API_KEY}`,
+        "Content-Type": "application/json",
+    },
 
-const confirmHotelBooking = async ({
-    hotelId,
-    bookingId,
-    bookingData,
+    timeout: 15000,
+});
+
+const normalizeExternalHotel = ({
+    hotel,
+    destination,
 }) => {
+    const normalizeCoordinate = (
+        value,
+        reference,
+        maxAbs
+    ) => {
+        const number = Number(value);
 
-    const result =
-        await liteApiBook(bookingData);
+        if (!Number.isFinite(number)) {
+            return null;
+        }
 
-    const hotel =
-        await Hotel.findById(hotelId);
+        const candidates = [];
 
-    if (!hotel) {
+        for (let power = 0; power <= 18; power++) {
+            const candidate =
+                number /
+                Math.pow(10, power);
+
+            if (
+                Math.abs(candidate) <= maxAbs
+            ) {
+                candidates.push(candidate);
+            }
+        }
+
+        if (!candidates.length) {
+            return null;
+        }
+
+        candidates.sort(
+            (a, b) =>
+                Math.abs(a - reference) -
+                Math.abs(b - reference)
+        );
+
+        return candidates[0];
+    };
+
+    const latitude =
+        normalizeCoordinate(
+            hotel.location?.lat,
+            destination.location.coordinates[1], 
+            90
+    );
+
+    const longitude =
+        normalizeCoordinate(
+            hotel.location?.lng,
+            destination.location.coordinates[0],
+            180
+    );
+
+    if (
+        latitude === null ||
+        longitude === null ||
+        latitude < -90 ||
+        latitude > 90 ||
+        longitude < -180 ||
+        longitude > 180
+    ) {
         throw new ApiError(
-            404,
-            "Hotel not found."
+            502,
+            "Invalid hotel coordinates returned by provider."
         );
     }
 
-    const booking =
-        hotel.bookings.id(bookingId);
+    const hotelTypeMap = {
+        apartment: "Apartment",
+        hotel: "Hotel",
+        hostel: "Hostel",
+        villa: "Villa",
+        guesthouse: "Guest House",
+        resort: "Resort",
+    };
 
-    if (!booking) {
-        throw new ApiError(
-            404,
-            "Booking not found."
-        );
-    }
+    return {
+        name:
+            hotel.name || "Hotel",
 
-    booking.status = "CONFIRMED";
+        destination:
+            destination._id,
 
-    booking.bookingResponse = result;
+        address:
+            hotel.location?.address || "",
 
-    booking.providerBookingId =
-        result?.data?.bookingId ||
-        result?.bookingId ||
-        "";
+        city:
+            hotel.location?.city ||
+            destination.city,
 
-    await hotel.save();
+        state:
+            hotel.location?.region || "",
 
-    return booking;
+        country:
+            hotel.location?.country ||
+            destination.country,
+
+        location: {
+            type: "Point",
+            coordinates: [
+                longitude,
+                latitude,
+            ],
+        },
+
+        hotelType:
+            hotelTypeMap[
+                String(
+                    hotel.propertyType || ""
+                ).toLowerCase()
+            ] || "Hotel",
+
+        starRating:
+            Number(hotel.starRating) || 1,
+
+        averageRating:
+            Number(hotel.guestRating) || 0,
+
+        reviewCount:
+            Number(hotel.reviewCount) || 0,
+
+        pricePerNight:
+            Number(
+                hotel.price?.nightlyPrice ??
+                hotel.price?.nightly ??
+                0
+            ),
+
+        currency:
+            hotel.price?.currency ||
+            "USD",
+
+        amenities:
+            Array.isArray(
+                hotel.amenities
+            )
+                ? hotel.amenities
+                : [],
+
+        isActive: true,
+
+        externalProvider:
+            hotel.platform || "StayingAPI",
+
+        externalHotelId:
+            hotel.id || null,
+
+        externalListingId:
+            hotel.platformListingId ||
+            null,
+        images:
+            Array.isArray(hotel.images)
+                ? hotel.images
+                : [],
+        price: hotel.price
+            ? (() => {
+
+                const nightly =
+                    Number(
+                        hotel.price.nightly ??
+                        hotel.price.nightlyPrice ??
+                        0
+                    );
+
+                const nights =
+                    Number(
+                        hotel.price.nights ??
+                        0
+                    );
+
+                const providerTotal =
+                    Number(
+                        hotel.price.total ??
+                        0
+                    );
+
+                const taxes =
+                    Number(
+                        hotel.price.taxes ??
+                        0
+                    );
+
+                const total =
+                    providerTotal > 0
+                        ? providerTotal
+                        : nightly > 0 && nights > 0
+                            ? nightly * nights + taxes
+                            : 0;
+
+                return {
+                    nightly,
+
+                    total,
+
+                    currency:
+                        hotel.price.currency ||
+                        "USD",
+
+                    nights,
+
+                    taxes,
+                };
+            })()
+            : null,        
+            bookingUrl:
+                hotel.url || null,
+    };
 };
 
+// Generate Slug
 
 const generateSlug = (
     name,
@@ -84,6 +250,8 @@ const generateSlug = (
         }
     );
 };
+
+// Upload Gallery Images
 
 const uploadGalleryImages = async (
     files = []
@@ -114,6 +282,8 @@ const uploadGalleryImages = async (
     return uploadedImages;
 };
 
+// Delete Gallery Images
+
 const deleteGalleryImages = async (
     images = []
 ) => {
@@ -125,6 +295,8 @@ const deleteGalleryImages = async (
         }
     }
 };
+
+// Create Hotel
 
 const createHotel = async ({
     hotelData,
@@ -142,6 +314,8 @@ const createHotel = async ({
       );
     }
     
+    // Verify Destination
+    
     if (hotelData.destination) {
         const destination = await Destination.findById(
             hotelData.destination
@@ -155,11 +329,15 @@ const createHotel = async ({
         }
     }
 
+    // Generate Slug
+
     const slug = generateSlug(
         hotelData.name,
         hotelData.city,
         hotelData.country
     );
+
+    // Duplicate Check
 
     const existingHotel =
         await Hotel.findOne({
@@ -177,6 +355,7 @@ const createHotel = async ({
     let uploadedGalleryImages = [];
 
     try {
+        // Upload Cover Image
 
         if (coverImage) {
             const response =
@@ -200,12 +379,16 @@ const createHotel = async ({
 
         }
 
+        // Upload Gallery Images
+
         if (galleryImages.length > 0) {
             uploadedGalleryImages =
                 await uploadGalleryImages(
                     galleryImages
                 );
         }
+
+        // Create Hotel
 
         const hotel =
             await Hotel.create({
@@ -220,6 +403,7 @@ const createHotel = async ({
         return hotel;
     }
     catch (error) {
+      // Rollback Cover Image
       
         if (
             uploadedCoverImage?.publicId
@@ -228,6 +412,8 @@ const createHotel = async ({
                 uploadedCoverImage.publicId
             );
         }
+
+        // Rollback Gallery Images
         
         await deleteGalleryImages(
             uploadedGalleryImages
@@ -236,6 +422,8 @@ const createHotel = async ({
         throw error;
     }
 };
+
+// Get All Hotels
 
 const getAllHotels = async ({
     page = 1,
@@ -289,6 +477,8 @@ const getAllHotels = async ({
             },
         ];
     }
+
+    // Filters
   
     if (destination) {
         query.destination = destination;
@@ -331,9 +521,11 @@ const getAllHotels = async ({
     }
 
     if (isFeatured !== undefined) {
-        quey.isFeatured =
+        query.isFeatured =
             isFeatured === "true";
     }
+
+    // Sorting
 
     let sortOption = {
         createdAt: -1,
@@ -417,6 +609,8 @@ const getAllHotels = async ({
     };
 };
 
+// Get Hotel By ID
+
 const getHotelById = async (
     hotelId
 ) => {
@@ -444,6 +638,8 @@ const getHotelById = async (
 
     return hotel;
 };
+
+// Search Hotels
 
 const searchHotels = async (
     keyword
@@ -502,6 +698,548 @@ const searchHotels = async (
         .lean();
 };
 
+const waitForStayingApiJob = async ({
+    jobId,
+    maxWaitMs = 5 * 60 * 1000,
+    pollIntervalMs = 5000,
+}) => {
+    const startedAt = Date.now();
+
+    while (
+        Date.now() - startedAt <
+        maxWaitMs
+    ) {
+        const response =
+            await stayingApiClient.get(
+                `/v1/jobs/${jobId}`
+            );
+        
+        console.log(
+            "StayingAPI job response:",
+            JSON.stringify(
+                response.data,
+                null,
+                2
+            )
+        );
+
+        const job =
+            response.data?.data;
+
+        if (!job) {
+            throw new ApiError(
+                502,
+                "Invalid StayingAPI job response."
+            );
+        }
+
+        if (job.status === "completed") {
+            return job.result;
+        }
+
+        if (
+            job.status === "failed" ||
+            job.status === "cancelled"
+        ) {
+            throw new ApiError(
+                502,
+                job.error ||
+                    `StayingAPI job ${job.status}.`
+            );
+        }
+
+        await new Promise(
+            (resolve) =>
+                setTimeout(
+                    resolve,
+                    pollIntervalMs
+                )
+        );
+    }
+
+    throw new ApiError(
+        504,
+        "Hotel search timed out."
+    );
+};
+
+const searchExternalHotels = async ({
+    destinationId,
+    checkIn,
+    checkOut,
+    adults = 2,
+    rooms = 1,
+    limit = 20,
+}) => {
+    if (!destinationId) {
+        throw new ApiError(
+            400,
+            "Destination ID is required."
+        );
+    }
+
+    if (!checkIn || !checkOut) {
+        throw new ApiError(
+            400,
+            "Check-in and check-out dates are required."
+        );
+    }
+
+    const destination =
+        await Destination.findOne({
+            _id: destinationId,
+            isActive: true,
+        }).select(
+            "name city country location"
+        );
+
+    if (!destination) {
+        throw new ApiError(
+            404,
+            "Destination not found."
+        );
+    }
+
+    const [
+        longitude,
+        latitude,
+    ] =
+        destination.location
+            ?.coordinates || [];
+
+    if (
+        !Number.isFinite(longitude) ||
+        !Number.isFinite(latitude)
+    ) {
+        throw new ApiError(
+            400,
+            "Destination coordinates are unavailable."
+        );
+    }
+
+    try {
+        console.log(
+            "StayingAPI request:",
+            {
+                location:
+                    `${destination.city}, ${destination.country}`,
+                checkIn,
+                checkOut,
+                adults: Number(adults),
+                children: 0,
+                platforms: "booking",
+                limit: Math.min(
+                    Number(limit) || 20,
+                    50
+                ),
+            }
+        );
+
+        const response =
+            await stayingApiClient.get(
+                "/v1/search",
+                {
+                    params: {
+                        location:
+                            `${destination.city}, ${destination.country}`,
+
+                        checkIn,
+
+                        checkOut,
+
+                        adults:
+                            Number(adults),
+
+                        children: 0,
+
+                        platforms:
+                            "booking",
+
+                        limit: Math.min(
+                            Number(limit) || 20,
+                            50
+                        ),
+                    },
+                }
+            );
+
+        let providerResult;
+
+        // -----------------------------------
+        // Handle asynchronous StayingAPI job
+        // -----------------------------------
+
+        if (
+            response.status === 202 &&
+            response.data?.data?.jobId
+        ) {
+            providerResult =
+                await waitForStayingApiJob({
+                    jobId:
+                        response.data.data.jobId,
+                });
+
+            console.log(
+                "StayingAPI job completed."
+            );
+        }
+        else {
+            // Normal synchronous response
+            providerResult =
+                response.data;
+        }
+
+        // -----------------------------------
+        // Debug provider response
+        // -----------------------------------
+
+        console.log(
+            "FINAL PROVIDER RESULT:",
+            JSON.stringify(
+                providerResult,
+                null,
+                2
+            )
+        );
+
+        // -----------------------------------
+        // Extract hotels
+        // -----------------------------------
+
+        let hotels = [];
+
+        if (
+            Array.isArray(
+                providerResult
+            )
+        ) {
+            hotels =
+                providerResult;
+        }
+
+        else if (
+            Array.isArray(
+                providerResult?.data
+            )
+        ) {
+            hotels =
+                providerResult.data;
+        }
+
+        else if (
+            Array.isArray(
+                providerResult?.hotels
+            )
+        ) {
+            hotels =
+                providerResult.hotels;
+        }
+
+        else if (
+            Array.isArray(
+                providerResult?.data?.hotels
+            )
+        ) {
+            hotels =
+                providerResult.data.hotels;
+        }
+
+        else if (
+            Array.isArray(
+                providerResult?.data?.data
+            )
+        ) {
+            hotels =
+                providerResult.data.data;
+        }
+
+        console.log(
+            "FINAL EXTRACTED HOTEL COUNT:",
+            hotels.length
+        );
+
+        // -----------------------------------
+        // Metadata
+        // -----------------------------------
+
+        const meta =
+            providerResult?.meta ||
+            providerResult?.data?.meta ||
+            {};
+
+        // -----------------------------------
+        // No hotels
+        // -----------------------------------
+
+        if (!hotels.length) {
+            return {
+                hotels: [],
+                meta,
+                message:
+                    "No hotels found for the selected destination and dates.",
+            };
+        }
+
+        // -----------------------------------
+        // Normalize hotels
+        // -----------------------------------
+
+        const normalizedHotels =
+            hotels.map((hotel) => {
+                const normalized =
+                    normalizeExternalHotel({
+                        hotel,
+                        destination,
+                    });
+
+                return {
+                    ...normalized,
+
+                    externalId:
+                        hotel.id || null,
+
+                    platform:
+                        hotel.platform || null,
+
+                    platformListingId:
+                        hotel.platformListingId ||
+                        null,
+
+                    bookingUrl:
+                        hotel.url || null,
+
+                    images:
+                        Array.isArray(
+                            hotel.images
+                        )
+                            ? hotel.images
+                            : [],
+
+                    source:
+                        "StayingAPI",
+                };
+            });
+
+        // -----------------------------------
+        // Final response
+        // -----------------------------------
+
+        return {
+            hotels:
+                normalizedHotels,
+
+            meta,
+
+            message:
+                "Hotels fetched successfully from StayingAPI.",
+        };
+
+    }
+    catch (error) {
+
+        console.error(
+            "StayingAPI hotel search error:",
+            error.response?.data ||
+                error.message
+        );
+
+        throw new ApiError(
+            error.response?.status ||
+                502,
+
+            "Unable to fetch hotels from StayingAPI."
+        );
+    }
+};
+
+const saveExternalHotel = async ({
+    hotelData,
+}) => {
+    const {
+        externalProvider,
+        externalHotelId,
+        externalListingId,
+        bookingUrl,
+        name,
+        destination,
+        address = "",
+        city = "",
+        state = "",
+        country = "",
+        location,
+        hotelType = "Hotel",
+        starRating = 1,
+        averageRating = 0,
+        reviewCount = 0,
+        pricePerNight = 0,
+        currency = "EUR",
+        amenities = [],
+    } = hotelData;
+
+    if (!destination) {
+        throw new ApiError(
+            400,
+            "Destination is required."
+        );
+    }
+
+    const destinationExists =
+        await Destination.exists({
+            _id: destination,
+            isActive: true,
+        });
+
+    if (!destinationExists) {
+        throw new ApiError(
+            404,
+            "Destination not found."
+        );
+    }
+
+    if (!externalHotelId) {
+        throw new ApiError(
+            400,
+            "External hotel ID is required."
+        );
+    }
+
+    const existing =
+        await Hotel.findOne({
+            externalProvider,
+            externalHotelId,
+        });
+
+    if (existing) {
+        return existing;
+    }
+
+    const slug = generateSlug(
+        name,
+        city,
+        country
+    );
+
+    const hotel =
+        await Hotel.create({
+            name,
+            slug,
+
+            destination,
+
+            address,
+            city,
+            state,
+            country,
+
+            location,
+
+            hotelType,
+
+            starRating:
+                Math.min(
+                    Math.max(
+                        Number(starRating) || 1,
+                        1
+                    ),
+                    5
+                ),
+
+            averageRating:
+                Number(averageRating) || 0,
+
+            reviewCount:
+                Number(reviewCount) || 0,
+
+            pricePerNight:
+                Number(pricePerNight) || 0,
+
+            currency,
+
+            amenities,
+
+            externalProvider,
+
+            externalHotelId,
+
+            externalListingId:
+                externalListingId || null,
+
+            bookingUrl:
+                bookingUrl || null,
+
+            isActive: true,
+        });
+
+    return hotel;
+};
+
+// Get Hotel Booking URL
+
+const getHotelBookingUrl = async ({
+    hotelId,
+}) => {
+
+    if (
+        !mongoose.Types.ObjectId.isValid(
+            hotelId
+        )
+    ) {
+        throw new ApiError(
+            400,
+            "Invalid hotel ID."
+        );
+    }
+
+    const hotel =
+        await Hotel.findOne({
+            _id: hotelId,
+            isActive: true,
+        }).lean();
+
+    if (!hotel) {
+        throw new ApiError(
+            404,
+            "Hotel not found."
+        );
+    }
+
+    if (
+        !hotel.bookingUrl
+    ) {
+        throw new ApiError(
+            404,
+            "Booking URL is not available for this hotel."
+        );
+    }
+
+    if (
+        !hotel.externalProvider
+    ) {
+        throw new ApiError(
+            400,
+            "External booking provider is not configured for this hotel."
+        );
+    }
+
+    return {
+        hotelId: hotel._id,
+
+        provider:
+            hotel.externalProvider,
+
+        externalHotelId:
+            hotel.externalHotelId,
+
+        externalListingId:
+            hotel.externalListingId,
+
+        bookingUrl:
+            hotel.bookingUrl,
+    };
+};
+
+// Filter Hotels
+
 const filterHotels = async ({
     destination,
     city,
@@ -516,6 +1254,8 @@ const filterHotels = async ({
     const query = {
         isActive: true,
     };
+
+    // Filters
 
     if (destination) {
         query.destination =
@@ -588,6 +1328,8 @@ const filterHotels = async ({
         .lean();
 };
 
+// Update Hotel
+
 const updateHotel = async ({
     hotelId,
     hotelData,
@@ -609,6 +1351,8 @@ const updateHotel = async ({
             "Hotel not found."
         );
     }
+
+    // Verify Destination (if changed)
 
     if (hotelData.destination) {
         const destination = await Destination.findById(
@@ -633,6 +1377,7 @@ const updateHotel = async ({
     let uploadedGalleryImages = [];
 
     try {
+        // Upload New Cover Image
 
         if (coverImage) {
             const response =
@@ -670,7 +1415,6 @@ const updateHotel = async ({
                 uploadedGalleryImages;
         }
 
-
         Object.entries(hotelData).forEach(
             ([key, value]) => {
                 if (
@@ -682,7 +1426,6 @@ const updateHotel = async ({
                 }
             }
         );
-
 
         if (
             hotelData.name ||
@@ -700,7 +1443,6 @@ const updateHotel = async ({
         }
 
         await hotel.save();
-
 
         if (
             coverImage &&
@@ -778,526 +1520,15 @@ const deleteHotel = async (
     return true;
 };
 
-const searchExternalHotels = async (data) => {
-    return await searchHotelsExternal(data);
-};
-
-const searchExternalHotelsByCoordinates = async (data) => {
-    return await searchHotelsByCoordinates(data);
-};
-
-const getExternalHotelFilter = async (data) => {
-    return await getHotelFilter(data);
-};
-
-const getExternalHotelDetails = async (data) => {
-    return await getHotelDetailsExternal(data);
-};
-
-const getExternalRoomAvailability = async (data) => {
-    return await getRoomAvailability(data);
-};
-
-const getExternalRoomList = async (data) => {
-    return await getRoomList(data);
-};
-
-const getExternalRoomListWithAvailability = async (data) => {
-    return await getRoomListWithAvailability(data);
-};
-
-const getExternalHotelPhotos = async (data) => {
-    return await getHotelPhotos(data);
-};
-const prebookHotel = async ({
-    userId,
-    hotelId,
-    offerId,
-    usePaymentSdk = false,
-    hotelName = "",
-    checkIn,
-    checkOut,
-    currency = "USD",
-}) => {
-
-    if (!userId) {
-
-        throw new ApiError(
-            401,
-            "User authentication required."
-        );
-    }
-
-
-    if (!hotelId) {
-
-        throw new ApiError(
-            400,
-            "hotelId is required."
-        );
-    }
-
-
-    if (!offerId) {
-
-        throw new ApiError(
-            400,
-            "offerId is required."
-        );
-    }
-
-
-    const hotel =
-        await Hotel.findById(hotelId);
-
-
-    if (!hotel) {
-
-        throw new ApiError(
-            404,
-            "Hotel not found."
-        );
-    }
-
-
-    const result =
-        await liteApiPrebook({
-
-            offerId,
-
-            usePaymentSdk,
-        });
-
-
-    const prebookId =
-        result?.data?.prebookId ||
-        result?.prebookId ||
-        "";
-
-
-    if (!prebookId) {
-
-        throw new ApiError(
-            502,
-            "LiteAPI did not return a prebookId."
-        );
-    }
-
-
-    // Add booking directly inside Hotel
-    hotel.bookings.push({
-
-        user: userId,
-
-        provider: "liteapi",
-
-        hotelId: String(hotelId),
-
-        hotelName:
-            hotelName ||
-            hotel.name,
-
-        offerId,
-
-        prebookId,
-
-        checkIn,
-
-        checkOut,
-
-        currency,
-
-        status: "PREBOOKED",
-
-        prebookResponse: result,
-    });
-
-
-    await hotel.save();
-
-
-    const booking =
-        hotel.bookings[
-            hotel.bookings.length - 1
-        ];
-
-
-    return {
-
-        booking,
-
-        liteApi: result,
-    };
-};
-
-
-const bookHotel = async ({
-    userId,
-    hotelId,
-    bookingId,
-    bookingData,
-}) => {
-
-    if (!userId) {
-
-        throw new ApiError(
-            401,
-            "User authentication required."
-        );
-    }
-
-
-    const hotel =
-        await Hotel.findById(hotelId);
-
-
-    if (!hotel) {
-
-        throw new ApiError(
-            404,
-            "Hotel not found."
-        );
-    }
-
-
-    const booking =
-        hotel.bookings.id(bookingId);
-
-
-    if (!booking) {
-
-        throw new ApiError(
-            404,
-            "Booking not found."
-        );
-    }
-
-
-    if (
-        booking.user.toString() !==
-        userId.toString()
-    ) {
-
-        throw new ApiError(
-            403,
-            "You are not allowed to access this booking."
-        );
-    }
-
-
-    if (!booking.prebookId) {
-
-        throw new ApiError(
-            400,
-            "Prebook ID is missing."
-        );
-    }
-
-
-    const result =
-        await liteApiBook({
-
-            ...bookingData,
-
-            prebookId:
-                booking.prebookId,
-        });
-
-
-    booking.status =
-        "CONFIRMED";
-
-
-    booking.bookingResponse =
-        result;
-
-
-    booking.providerBookingId =
-        result?.data?.bookingId ||
-        result?.bookingId ||
-        result?.data?.id ||
-        "";
-
-
-    if (
-        bookingData?.holder
-    ) {
-
-        booking.holder =
-            bookingData.holder;
-    }
-
-
-    if (
-        bookingData?.guests
-    ) {
-
-        booking.guests =
-            bookingData.guests;
-    }
-
-
-    await hotel.save();
-
-
-    return {
-
-        booking,
-
-        liteApi:
-            result,
-    };
-};
-
-
-const getHotelBooking = async ({
-    userId,
-    hotelId,
-    bookingId,
-}) => {
-
-    const hotel =
-        await Hotel.findById(
-            hotelId
-        );
-
-
-    if (!hotel) {
-
-        throw new ApiError(
-            404,
-            "Hotel not found."
-        );
-    }
-
-
-    const booking =
-        hotel.bookings.id(
-            bookingId
-        );
-
-
-    if (!booking) {
-
-        throw new ApiError(
-            404,
-            "Booking not found."
-        );
-    }
-
-
-    if (
-        booking.user.toString() !==
-        userId.toString()
-    ) {
-
-        throw new ApiError(
-            403,
-            "You are not allowed to access this booking."
-        );
-    }
-
-    if (
-        booking.providerBookingId
-    ) {
-
-        const result =
-            await liteApiGetBooking(
-                booking.providerBookingId
-            );
-
-
-        booking.bookingResponse =
-            result;
-
-
-        await hotel.save();
-    }
-
-
-    return booking;
-};
-
-const getUserHotelBookings =
-    async (userId) => {
-
-        const hotels =
-            await Hotel.find({
-
-                "bookings.user":
-                    userId,
-
-            })
-            .select(
-                "name city country coverImage bookings"
-            )
-            .lean();
-
-
-        const bookings = [];
-
-
-        for (
-            const hotel of hotels
-        ) {
-
-            const userBookings =
-                hotel.bookings.filter(
-                    (booking) =>
-                        booking.user.toString() ===
-                        userId.toString()
-                );
-
-
-            for (
-                const booking of userBookings
-            ) {
-
-                bookings.push({
-
-                    ...booking,
-
-                    hotel: {
-
-                        _id:
-                            hotel._id,
-
-                        name:
-                            hotel.name,
-
-                        city:
-                            hotel.city,
-
-                        country:
-                            hotel.country,
-
-                        coverImage:
-                            hotel.coverImage,
-                    },
-                });
-            }
-        }
-
-
-        return bookings;
-    };
-
-const cancelHotelBooking =
-    async ({
-        userId,
-        hotelId,
-        bookingId,
-    }) => {
-
-        const hotel =
-            await Hotel.findById(
-                hotelId
-            );
-
-
-        if (!hotel) {
-
-            throw new ApiError(
-                404,
-                "Hotel not found."
-            );
-        }
-
-
-        const booking =
-            hotel.bookings.id(
-                bookingId
-            );
-
-
-        if (!booking) {
-
-            throw new ApiError(
-                404,
-                "Booking not found."
-            );
-        }
-
-
-        if (
-            booking.user.toString() !==
-            userId.toString()
-        ) {
-
-            throw new ApiError(
-                403,
-                "You are not allowed to cancel this booking."
-            );
-        }
-
-
-        if (
-            !booking.providerBookingId
-        ) {
-
-            throw new ApiError(
-                400,
-                "Provider booking ID not found."
-            );
-        }
-
-
-        const result =
-            await liteApiCancelBooking(
-                booking.providerBookingId
-            );
-
-
-        booking.status =
-            "CANCELLED";
-
-
-        booking.cancellation.status =
-            "CANCELLED";
-
-
-        booking.cancellation.cancelledAt =
-            new Date();
-
-
-        booking.cancellationResponse =
-            result;
-
-
-        await hotel.save();
-
-
-        return {
-
-            booking,
-
-            liteApi:
-                result,
-        };
-    };
-
 export const hotelService = {
-    // Local hotels
     createHotel,
     getAllHotels,
     getHotelById,
     searchHotels,
+    searchExternalHotels,
+    saveExternalHotel,
+    getHotelBookingUrl,
     filterHotels,
     updateHotel,
     deleteHotel,
-    // External hotel APIs
-    searchExternalHotels,
-    searchExternalHotelsByCoordinates,
-    getExternalHotelFilter,
-    getExternalHotelDetails,
-    getExternalRoomAvailability,
-    getExternalRoomList,
-    getExternalRoomListWithAvailability,
-    getExternalHotelPhotos,
-    // Hotel booking
-    prebookHotel,
-    bookHotel,
-    getHotelBooking,
-    getUserHotelBookings,
-    cancelHotelBooking,
 };

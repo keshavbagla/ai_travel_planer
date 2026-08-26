@@ -6,6 +6,8 @@ import {
     searchBookings,
     filterBookings,
     updateBooking,
+    initiateExternalBooking,
+    confirmBooking,
     cancelBooking,
     deleteBooking,
 } from "../controllers/booking.controller.js";
@@ -13,6 +15,7 @@ import { verifyJWT } from "../middlewares/auth.middleware.js";
 import { authorize } from "../middlewares/admin.middleware.js";
 
 const router = Router();
+
 
 router.use(verifyJWT);
 
@@ -34,6 +37,16 @@ router.get(
 router.get(
     "/filter",
     filterBookings
+);
+
+router.post(
+    "/:bookingId/redirect",
+    initiateExternalBooking
+);
+
+router.post(
+    "/:bookingId/confirm",
+    confirmBooking
 );
 
 router.get(

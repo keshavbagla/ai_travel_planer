@@ -1,147 +1,260 @@
 import mongoose, { Schema } from "mongoose";
 
-const bookingItemSchema = new Schema(
-  {
-    type: {
-      type: String,
-      enum: [
-        "Flight",
-        "Hotel",
-        "Activity",
-        "Transport",
-        "Package",
-      ],
-      required: true,
+const guestDetailsSchema = new Schema(
+    {
+        firstName: {
+            type: String,
+            trim: true,
+            default: "",
+        },
+
+        lastName: {
+            type: String,
+            trim: true,
+            default: "",
+        },
+
+        email: {
+            type: String,
+            trim: true,
+            lowercase: true,
+            default: "",
+        },
+
+        phone: {
+            type: String,
+            trim: true,
+            default: "",
+        },
     },
-
-    provider: String,
-    name: String,
-    bookingReference: String,
-    bookingURL: String,
-
-    bookingDate: {
-      type: Date,
-      default: Date.now,
-    },
-
-    startDate: Date,
-    endDate: Date,
-
-    status: {
-      type: String,
-      enum: [
-        "Pending",
-        "Confirmed",
-        "Cancelled",
-        "Refunded",
-        "Completed",
-      ],
-      default: "Pending",
-    },
-
-    price: {
-      amount: Number,
-      currency: {
-        type: String,
-        default: "INR",
-      },
-    },
-
-    cancellationPolicy: String,
-
-    metadata: {
-      type: Schema.Types.Mixed,
-      default: {},
-    },
-  },
-  {
-    _id: false,
-  }
+    {
+        _id: false,
+    }
 );
 
 const bookingSchema = new Schema(
-  {
+    {
 
-    user: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-      index: true,
+        user: {
+            type: Schema.Types.ObjectId,
+            ref: "User",
+            required: true,
+            index: true,
+        },
+
+        trip: {
+            type: Schema.Types.ObjectId,
+            ref: "Trip",
+            required: true,
+            index: true,
+        },
+
+        type: {
+            type: String,
+            enum: [
+                "Flight",
+                "Hotel",
+                "Activity",
+            ],
+            required: true,
+            index: true,
+        },
+
+        item: {
+            type: Schema.Types.ObjectId,
+            required: true,
+            refPath: "itemModel",
+        },
+
+        itemModel: {
+            type: String,
+            enum: [
+                "Flight",
+                "Hotel",
+                "Activity",
+            ],
+            required: true,
+        },
+
+        provider: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+
+        externalItemId: {
+            type: String,
+            default: "",
+            trim: true,
+        },
+
+        providerBookingId: {
+            type: String,
+            default: "",
+            trim: true,
+        },
+
+        bookingUrl: {
+            type: String,
+            default: "",
+            trim: true,
+        },
+
+        bookingMode: {
+            type: String,
+            enum: [
+                "ExternalRedirect",
+                "DirectAPI",
+            ],
+            default: "ExternalRedirect",
+        },
+
+        status: {
+            type: String,
+            enum: [
+                "Selected",
+                "BookingInitiated",
+                "Redirected",
+                "Confirmed",
+                "Cancelled",
+                "Failed",
+            ],
+            default: "Selected",
+            index: true,
+        },
+
+        guestDetails: {
+            type: guestDetailsSchema,
+            default: () => ({}),
+        },
+
+        travelers: {
+            adults: {
+                type: Number,
+                default: 1,
+                min: 1,
+            },
+
+            children: {
+                type: Number,
+                default: 0,
+                min: 0,
+            },
+
+            infants: {
+                type: Number,
+                default: 0,
+                min: 0,
+            },
+        },
+
+        amount: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
+
+        currency: {
+            type: String,
+            default: "INR",
+            uppercase: true,
+            trim: true,
+        },
+
+        startDate: {
+            type: Date,
+            default: null,
+        },
+
+        endDate: {
+            type: Date,
+            default: null,
+        },
+
+        redirectedAt: {
+            type: Date,
+            default: null,
+        },
+
+        confirmedAt: {
+            type: Date,
+            default: null,
+        },
+
+        cancelledAt: {
+            type: Date,
+            default: null,
+        },
+
+        metadata: {
+            type: Schema.Types.Mixed,
+            default: {},
+        },
     },
-
-    trip: {
-      type: Schema.Types.ObjectId,
-      ref: "Trip",
-      required: true,
-      index: true,
-    },
-
-    bookingNumber: {
-      type: String,
-      required: true,
-      unique: true,
-      uppercase: true,
-      trim: true,
-    },
-
-    bookingItems: [bookingItemSchema],
-
-    totalAmount: {
-      type: Number,
-      required: true,
-      min: 0,
-    },
-
-    currency: {
-      type: String,
-      default: "INR",
-    },
-
-    bookingStatus: {
-      type: String,
-      enum: [
-        "Pending",
-        "Partially Confirmed",
-        "Confirmed",
-        "Cancelled",
-        "Completed",
-      ],
-      default: "Pending",
-    },
-
-    paymentStatus: {
-      type: String,
-      enum: [
-        "Pending",
-        "Paid",
-        "Failed",
-        "Refunded",
-        "Partially Refunded",
-      ],
-      default: "Pending",
-    },
-
-    payment: {
-      type: Schema.Types.ObjectId,
-      ref: "Payment",
-    },
-    cancellationReason: String,
-    cancelledAt: Date,
-
-    bookedBy: {
-      type: String,
-      enum: [
-        "AI",
-        "User",
-      ],
-      default: "User",
-    },
-
-    notes: String,
-  },
-  {
-    timestamps: true,
-  }
+    {
+        timestamps: true,
+    }
 );
 
-export const Booking = mongoose.model("Booking", bookingSchema);
+bookingSchema.index({
+    user: 1,
+    createdAt: -1,
+});
+
+bookingSchema.index({
+    trip: 1,
+    createdAt: -1,
+});
+
+bookingSchema.index({
+    type: 1,
+    status: 1,
+});
+
+bookingSchema.index({
+    provider: 1,
+    externalItemId: 1,
+});
+
+bookingSchema.index({
+    provider: 1,
+    providerBookingId: 1,
+});
+
+// Virtual
+
+bookingSchema.virtual(
+    "totalTravelers"
+).get(function () {
+    if (!this.travelers) {
+        return 0;
+    }
+
+    return (
+        (this.travelers.adults || 0) +
+        (this.travelers.children || 0) +
+        (this.travelers.infants || 0)
+    );
+});
+
+
+bookingSchema.set(
+    "toJSON",
+    {
+        virtuals: true,
+        versionKey: false,
+    }
+);
+
+bookingSchema.set(
+    "toObject",
+    {
+        virtuals: true,
+        versionKey: false,
+    }
+);
+
+export const Booking = mongoose.model(
+    "Booking",
+    bookingSchema
+);

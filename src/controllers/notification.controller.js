@@ -1,44 +1,45 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
-import { paymentService } from "../services/payment.service.js";
+import { notificationService } from "../services/notification.service.js";
 
 import {
-    validateCreatePayment,
-    validateUpdatePayment,
-    validateRefundPayment,
-    validatePaymentId,
-} from "../validators/payment.validator.js";
+    validateCreateNotification,
+    validateUpdateNotification,
+    validateMarkAsRead,
+    validateNotificationId,
+} from "../validators/notification.validator.js";
 
-const createPayment = asyncHandler(
+
+const createNotification = asyncHandler(
     async (req, res) => {
-        const paymentData = {
+        const notificationData = {
             ...req.body,
             user: req.user._id,
         };
 
-        validateCreatePayment(
-            paymentData
+        validateCreateNotification(
+            notificationData
         );
 
-        const payment =
-            await paymentService.createPayment(
-                paymentData
+        const notification =
+            await notificationService.createNotification(
+                notificationData
             );
 
         return res.status(201).json(
             new ApiResponse(
                 201,
-                payment,
-                "Payment created successfully."
+                notification,
+                "Notification created successfully."
             )
         );
     }
 );
 
-const getAllPayments = asyncHandler(
+const getAllNotifications = asyncHandler(
     async (req, res) => {
-        const payments =
-            await paymentService.getAllPayments({
+        const notifications =
+            await notificationService.getAllNotifications({
                 page: req.query.page,
                 limit: req.query.limit,
                 user: req.user._id,
@@ -47,226 +48,193 @@ const getAllPayments = asyncHandler(
         return res.status(200).json(
             new ApiResponse(
                 200,
-                payments,
-                "Payments fetched successfully."
+                notifications,
+                "Notifications fetched successfully."
             )
         );
     }
 );
 
-const getPaymentById = asyncHandler(
-    async (req, res) => {
-        const { paymentId } =
-            req.params;
-
-        validatePaymentId(
-            paymentId
-        );
-
-        const payment =
-            await paymentService.getPaymentById({
-                paymentId,
-                user: req.user._id,
-            });
-
-        return res.status(200).json(
-            new ApiResponse(
-                200,
-                payment,
-                "Payment fetched successfully."
-            )
-        );
-    }
-);
-
-const searchPayments = asyncHandler(
-    async (req, res) => {
-        const payments =
-            await paymentService.searchPayments(
-                req.query.keyword,
-                req.user._id
-            );
-
-        return res.status(200).json(
-            new ApiResponse(
-                200,
-                payments,
-                "Search completed successfully."
-            )
-        );
-    }
-);
-
-const filterPayments = asyncHandler(
-    async (req, res) => {
-        const payments =
-            await paymentService.filterPayments({
-                ...req.query,
-                user: req.user._id,
-            });
-
-        return res.status(200).json(
-            new ApiResponse(
-                200,
-                payments,
-                "Payments filtered successfully."
-            )
-        );
-    }
-);
-
-const updatePayment = asyncHandler(
-    async (req, res) => {
-        const { paymentId } =
-            req.params;
-
-        validatePaymentId(
-            paymentId
-        );
-
-        validateUpdatePayment(
-            req.body
-        );
-
-        const payment =
-            await paymentService.updatePayment({
-                paymentId,
-                paymentData: req.body,
-                user: req.user._id,
-            });
-
-        return res.status(200).json(
-            new ApiResponse(
-                200,
-                payment,
-                "Payment updated successfully."
-            )
-        );
-    }
-);
-
-const markPaymentAsPaid =
+const getNotificationById =
     asyncHandler(
         async (req, res) => {
-            const { paymentId } =
-                req.params;
+            const {
+                notificationId,
+            } = req.params;
 
-            validatePaymentId(
-                paymentId
+            validateNotificationId(
+                notificationId
             );
 
-            const payment =
-                await paymentService.markPaymentAsPaid({
-                    paymentId,
-                    transactionId:
-                        req.body.transactionId,
+            const notification =
+                await notificationService.getNotificationById({
+                    notificationId,
                     user: req.user._id,
                 });
 
             return res.status(200).json(
                 new ApiResponse(
                     200,
-                    payment,
-                    "Payment marked as paid successfully."
+                    notification,
+                    "Notification fetched successfully."
                 )
             );
         }
     );
 
-const markPaymentAsFailed =
+const searchNotifications =
     asyncHandler(
         async (req, res) => {
-            const { paymentId } =
-                req.params;
+            const notifications =
+                await notificationService.searchNotifications(
+                    req.query.keyword,
+                    req.user._id
+                );
 
-            validatePaymentId(
-                paymentId
+            return res.status(200).json(
+                new ApiResponse(
+                    200,
+                    notifications,
+                    "Search completed successfully."
+                )
             );
+        }
+    );
 
-            const payment =
-                await paymentService.markPaymentAsFailed({
-                    paymentId,
-                    failureReason:
-                        req.body.failureReason,
+// Filter Notifications
+
+const filterNotifications =
+    asyncHandler(
+        async (req, res) => {
+            const notifications =
+                await notificationService.filterNotifications({
+                    ...req.query,
                     user: req.user._id,
                 });
 
             return res.status(200).json(
                 new ApiResponse(
                     200,
-                    payment,
-                    "Payment marked as failed successfully."
+                    notifications,
+                    "Notifications filtered successfully."
                 )
             );
         }
     );
 
-const refundPayment = asyncHandler(
-    async (req, res) => {
-        const { paymentId } =
-            req.params;
 
-        validatePaymentId(
-            paymentId
-        );
+const updateNotification =
+    asyncHandler(
+        async (req, res) => {
+            const {
+                notificationId,
+            } = req.params;
 
-        validateRefundPayment(
-            req.body
-        );
+            validateNotificationId(
+                notificationId
+            );
 
-        const payment =
-            await paymentService.refundPayment({
-                paymentId,
-                refundAmount:
-                    req.body.refundAmount,
-                refundReason:
-                    req.body.refundReason,
+            validateUpdateNotification(
+                req.body
+            );
+
+            const notification =
+                await notificationService.updateNotification({
+                    notificationId,
+                    notificationData:
+                        req.body,
+                    user: req.user._id,
+                });
+
+            return res.status(200).json(
+                new ApiResponse(
+                    200,
+                    notification,
+                    "Notification updated successfully."
+                )
+            );
+        }
+    );
+
+const markNotificationAsRead =
+    asyncHandler(
+        async (req, res) => {
+            const {
+                notificationId,
+            } = req.params;
+
+            validateMarkAsRead(
+                notificationId
+            );
+
+            const notification =
+                await notificationService.markNotificationAsRead({
+                    notificationId,
+                    user: req.user._id,
+                });
+
+            return res.status(200).json(
+                new ApiResponse(
+                    200,
+                    notification,
+                    "Notification marked as read successfully."
+                )
+            );
+        }
+    );
+
+const markAllNotificationsAsRead =
+    asyncHandler(
+        async (req, res) => {
+            const result =
+                await notificationService.markAllNotificationsAsRead(
+                    req.user._id
+                );
+
+            return res.status(200).json(
+                new ApiResponse(
+                    200,
+                    result,
+                    "All notifications marked as read successfully."
+                )
+            );
+        }
+    );
+
+const deleteNotification =
+    asyncHandler(
+        async (req, res) => {
+            const {
+                notificationId,
+            } = req.params;
+
+            validateNotificationId(
+                notificationId
+            );
+
+            await notificationService.deleteNotification({
+                notificationId,
                 user: req.user._id,
             });
 
-        return res.status(200).json(
-            new ApiResponse(
-                200,
-                payment,
-                "Payment refunded successfully."
-            )
-        );
-    }
-);
-
-const deletePayment = asyncHandler(
-    async (req, res) => {
-        const { paymentId } =
-            req.params;
-
-        validatePaymentId(
-            paymentId
-        );
-
-        await paymentService.deletePayment({
-            paymentId,
-            user: req.user._id,
-        });
-
-        return res.status(200).json(
-            new ApiResponse(
-                200,
-                {},
-                "Payment deleted successfully."
-            )
-        );
-    }
-);
+            return res.status(200).json(
+                new ApiResponse(
+                    200,
+                    {},
+                    "Notification deleted successfully."
+                )
+            );
+        }
+    );
 
 export {
-    createPayment,
-    getAllPayments,
-    getPaymentById,
-    searchPayments,
-    filterPayments,
-    updatePayment,
-    markPaymentAsPaid,
-    markPaymentAsFailed,
-    refundPayment,
-    deletePayment,
+    createNotification,
+    getAllNotifications,
+    getNotificationById,
+    searchNotifications,
+    filterNotifications,
+    updateNotification,
+    markNotificationAsRead,
+    markAllNotificationsAsRead,
+    deleteNotification,
 };

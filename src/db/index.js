@@ -1,20 +1,35 @@
 import mongoose from "mongoose";
 
-const connectDB = async () => {
-    try {
-        console.log("Connecting to:", process.env.MONGODB_URI);
+let cachedConnection = null;
 
-        const conn = await mongoose.connect(process.env.MONGODB_URI, {
-            serverSelectionTimeoutMS: 10000,
-        });
+const connectDB = async () => {
+    if (cachedConnection) {
+        return cachedConnection;
+    }
+
+    try {
+        console.log("Connecting to MongoDB...");
+
+        const conn = await mongoose.connect(
+            process.env.MONGODB_URI,
+            {
+                serverSelectionTimeoutMS: 10000,
+            }
+        );
+
+        cachedConnection = conn;
 
         console.log("✅ MongoDB Connected");
         console.log(conn.connection.host);
 
         return conn;
+
     } catch (error) {
-        console.error("MongoDB Error:");
+        console.error("❌ MongoDB Error:");
         console.error(error);
+
+        cachedConnection = null;
+
         throw error;
     }
 };
