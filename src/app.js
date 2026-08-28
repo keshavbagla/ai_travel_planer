@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import morgan from "morgan";
-import authRouter from "./routes/auth.routes.js";
+import authRouter from "./routes/auth.route.js";
 import destinationRouter from "./routes/destination.route.js";
 import hotelRouter from "./routes/hotel.route.js";
 import restaurantRouter from "./routes/restaurant.route.js";
