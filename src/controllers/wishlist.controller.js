@@ -10,8 +10,6 @@ import {
     validateWishlistId,
 } from "../validators/wishlist.validator.js";
 
-// Create Wishlist
-
 const createWishlist = asyncHandler(
     async (req, res) => {
         const wishlistData = {
@@ -38,8 +36,6 @@ const createWishlist = asyncHandler(
     }
 );
 
-// Get All Wishlist
-
 const getAllWishlist = asyncHandler(
     async (req, res) => {
         const wishlist =
@@ -58,8 +54,6 @@ const getAllWishlist = asyncHandler(
         );
     }
 );
-
-// Get Wishlist By ID
 
 const getWishlistById =
     asyncHandler(
@@ -87,8 +81,6 @@ const getWishlistById =
             );
         }
     );
-
-// Get Wishlist By Item
 
 const getWishlistByItem =
     asyncHandler(
@@ -131,8 +123,6 @@ const getWishlistByItem =
         }
     );
 
-// Search Wishlist
-
 const searchWishlist =
     asyncHandler(
         async (req, res) => {
@@ -151,8 +141,6 @@ const searchWishlist =
             );
         }
     );
-
-// Filter Wishlist
 
 const filterWishlist =
     asyncHandler(
@@ -173,7 +161,6 @@ const filterWishlist =
         }
     );
 
-// Update Wishlist
 
 const updateWishlist =
     asyncHandler(
@@ -208,7 +195,6 @@ const updateWishlist =
         }
     );
 
-// Delete Wishlist
 
 const deleteWishlist =
     asyncHandler(

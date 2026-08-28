@@ -15,7 +15,7 @@ import reviewRouter from "./routes/review.route.js";
 import wishlistRouter from "./routes/wishlist.route.js";
 import cancellationRouter from "./routes/cancellation.route.js";
 import travelerRouter from "./routes/traveler.route.js";
-import flightOfferRoutes from "./routes/flightOffer.route.js";
+import flightOfferRoutes from "./routes/flight.route.js";
 import { errorHandler } from "./middlewares/error.middleware.js";
 
 
