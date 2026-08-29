@@ -7,9 +7,9 @@ import {
     deleteRestaurant,
     searchRestaurants,
     searchExternalRestaurants,
-    saveExternalRestaurant,
+    saveExternalRestaurants,
     filterRestaurants,
-} from "../controllers/restaurant.controllers.js";import { upload } from "../middlewares/multer.middleware.js";
+} from "../controllers/restaurant.controller.js";import { upload } from "../middlewares/multer.middleware.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 import { authorize } from "../middlewares/admin.middleware.js";
 
@@ -40,7 +40,7 @@ router.get(
 router.post(
     "/select",
     verifyJWT,
-    saveExternalRestaurant
+    saveExternalRestaurants
 );
 
 router.get(

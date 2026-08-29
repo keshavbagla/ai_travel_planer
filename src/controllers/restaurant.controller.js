@@ -111,8 +111,38 @@ const searchRestaurants = asyncHandler(async (req, res) => {
     );
 });
 
+const searchExternalRestaurants =
+    asyncHandler(async (req, res) => {
+        const {
+            destinationId,
+            limit = 20,
+        } = req.query;
 
-const saveExternalRestaurant =
+        if (!destinationId) {
+            throw new ApiError(
+                400,
+                "Destination ID is required."
+            );
+        }
+
+        const restaurants =
+            await restaurantService
+                .searchExternalRestaurants({
+                    destinationId,
+                    limit,
+                });
+
+        return res.status(200).json(
+            new ApiResponse(
+                200,
+                restaurants,
+                "Restaurants fetched successfully from external API."
+            )
+        );
+});
+
+
+const saveExternalRestaurants =
     asyncHandler(async (req, res) => {
         const restaurant =
             await restaurantService
@@ -231,7 +261,9 @@ export {
     getAllRestaurants,
     getRestaurantById,
     searchRestaurants,
+    searchExternalRestaurants,
     filterRestaurants,
+    saveExternalRestaurants,
     updateRestaurant,
     deleteRestaurant,
 };

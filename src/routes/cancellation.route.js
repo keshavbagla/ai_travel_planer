@@ -4,9 +4,9 @@ import {
     createCancellation,
     getAllCancellations,
     getCancellationById,
-} from "../controllers/cancellation.controllers.js";
+} from "../controllers/cancellation.controller.js";
 
-import { verifyJWT } from "../middlewares/auth.middlewares.js";
+import { verifyJWT } from "../middlewares/auth.middleware.js";
 
 const router = Router();
 

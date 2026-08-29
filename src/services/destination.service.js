@@ -1,5 +1,5 @@
 import slugify from "slugify";
-import { Destination } from "../models/destination.models.js";
+import { Destination } from "../models/destination.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import {
     uploadOnCloudinary,
@@ -10,7 +10,6 @@ import {
     GEOAPIFY_API_KEY,
 } from "../config/geoapify.js";
 
-// Generate Slug
 
 const generateSlug = (name, city, country) => {
     return slugify(`${name}-${city}-${country}`, {
@@ -20,7 +19,6 @@ const generateSlug = (name, city, country) => {
     });
 };
 
-// Upload Gallery Images
 
 const uploadGalleryImages = async (files = []) => {
     const uploadedImages = [];
@@ -46,8 +44,6 @@ const uploadGalleryImages = async (files = []) => {
     return uploadedImages;
 };
 
-// Delete Destination Images
-
 const deleteGalleryImages = async (images = []) => {
     for (const image of images) {
         if (image.publicId) {
@@ -56,23 +52,17 @@ const deleteGalleryImages = async (images = []) => {
     }
 };
 
-// Create Destination
-
 const createDestination = async ({
     destinationData,
     coverImage,
     galleryImages = [],
 }) => {
 
-  // Generate slug
-
   const slug = generateSlug(
     destinationData.name,
     destinationData.city,
     destinationData.country
   );
-
-  // Duplicate check
   
   const existingDestination = await Destination.findOne({ slug, });
 
@@ -84,7 +74,6 @@ const createDestination = async ({
   let uploadedGalleryImages = [];
 
   try {
-  //  Upload Cover
     
     if (coverImage) {
         const response = await uploadOnCloudinary(
@@ -103,13 +92,9 @@ const createDestination = async ({
       };
     }
     
-    // Upload Gallery
-    
     if (galleryImages.length > 0) {
       uploadedGalleryImages = await uploadGalleryImages(galleryImages);
     }
-
-    //  Create Destination
 
     const destination = await Destination.create({
       ...destinationData,
@@ -123,7 +108,6 @@ const createDestination = async ({
   } 
     
   catch (error) {
-    //  Rollback Cloudinary
 
     if (uploadedCoverImage?.publicId) {
       await deleteFromCloudinary(uploadedCoverImage.publicId); 
@@ -134,8 +118,6 @@ const createDestination = async ({
     throw error;
   }
 };
-
-//  Get All Destinations
 
 const getAllDestinations = async ({
     page = 1,
@@ -156,8 +138,6 @@ const getAllDestinations = async ({
     const query = {
         isActive: true
     };
-
-    // Search
 
     if (search) {
         query.$or = [
@@ -220,8 +200,6 @@ const getAllDestinations = async ({
         query.isFeatured =
             isFeatured === "true";
     }
-
-    // Sorting
 
     let sortOption = {
         createdAt: -1
@@ -292,8 +270,6 @@ const getAllDestinations = async ({
     };
 };
 
-// Get Destination By ID
-
 const getDestinationById = async (
     destinationId
 ) => {
@@ -315,8 +291,6 @@ const getDestinationById = async (
 
     return destination;
 };
-
-// Search Destinations
 
 const searchLocalDestinations = async (
     keyword
@@ -586,8 +560,6 @@ const updateDestination = async ({
             };
         }
 
-        // Update Gallery Images
-
         if (galleryImages.length > 0) {
             await deleteGalleryImages(
                 destination.galleryImages
@@ -598,8 +570,6 @@ const updateDestination = async ({
                     galleryImages
                 );
         }
-
-        // Update Remaining Fields
 
         Object.entries(destinationData).forEach(([key, value]) => {
             if (
@@ -631,8 +601,6 @@ const updateDestination = async ({
     }
 };
 
-// Delete Destination
-
 const deleteDestination = async (destinationId) => {
     const destination = await Destination.findById(
         destinationId
@@ -642,21 +610,15 @@ const deleteDestination = async (destinationId) => {
         throw new ApiError(404, "Destination not found.");
     }
 
-    // Delete Cover
-
     if (destination.coverImage?.publicId) {
         await deleteFromCloudinary(
             destination.coverImage.publicId
         );
     }
 
-    // Delete Gallery 
-
     await deleteGalleryImages(
         destination.galleryImages
     );
-
-    // Delete Document 
 
     await destination.deleteOne();
 

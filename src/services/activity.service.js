@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import slugify from "slugify";
-import { Activity } from "../models/activity.models.js";
-import { Destination } from "../models/destination.models.js";
+import { Activity } from "../models/activity.model.js";
+import { Destination } from "../models/destination.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import {
     uploadOnCloudinary,
@@ -12,9 +12,6 @@ import {
     GEOAPIFY_API_KEY,
 } from "../config/geoapify.js";
 
-// Helper Functions
-
-// Generate Activity Slug
 
 const generateSlug = (
     name,

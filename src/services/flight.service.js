@@ -1,10 +1,10 @@
 import { FlightOffer } from "../models/flight.model.js";
-import { Trip } from "../models/trip.models.js";
+import { Trip } from "../models/trip.model.js";
 import { ApiError } from "../utils/ApiError.js";
 
 import {
     googleFlightsProvider,
-} from "./googleFlightsProvider.service.js";
+} from "./googleFlightProvider.service.js";
 
 const parseProviderDate = (value) => {
     if (!value) {

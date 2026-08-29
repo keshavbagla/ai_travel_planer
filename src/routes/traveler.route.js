@@ -8,9 +8,9 @@ import {
     deleteTraveler,
     setPrimaryTraveler,
     searchTravelers,
-} from "../controllers/traveler.controllers.js";
+} from "../controllers/traveler.controller.js";
 
-import { verifyJWT } from "../middlewares/auth.middlewares.js";
+import { verifyJWT } from "../middlewares/auth.middleware.js";
 
 const router = Router();
 

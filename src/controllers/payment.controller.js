@@ -1,13 +1,13 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
-import { paymentService } from "../services/payment.services.js";
+import { paymentService } from "../services/payment.service.js";
 
 import {
     validateCreatePayment,
     validateUpdatePayment,
     validateRefundPayment,
     validatePaymentId,
-} from "../validators/payment.validators.js";
+} from "../validators/payment.validator.js";
 
 
 const createPayment = asyncHandler(

@@ -1,7 +1,7 @@
 import { ApiError } from "../utils/ApiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
-import { reviewService } from "../services/review.services.js";
+import { reviewService } from "../services/review.service.js";
 
 import {
     validateCreateReview,

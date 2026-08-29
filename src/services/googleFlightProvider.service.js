@@ -5,7 +5,7 @@ import {
 
 import {
     createFlightSearchCacheKey,
-} from "../utils/flightCache.util.js";
+} from "../utils/flightCache.utils.js";
 
 import { ApiError } from "../utils/ApiError.js";
 

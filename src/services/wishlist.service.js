@@ -1,9 +1,9 @@
-import { Wishlist } from "../models/wishlist.models.js";
-import { User } from "../models/user.models.js";
-import { Trip } from "../models/trip.models.js";
-import { Hotel } from "../models/hotel.models.js";
-import { Activity } from "../models/activity.models.js";
-import { Restaurant } from "../models/restaurant.models.js";
+import { Wishlist } from "../models/wishlist.model.js";
+import { User } from "../models/user.model.js";
+import { Trip } from "../models/trip.model.js";
+import { Hotel } from "../models/hotel.model.js";
+import { Activity } from "../models/activity.model.js";
+import { Restaurant } from "../models/restaurant.model.js";
 import { ApiError } from "../utils/ApiError.js";
 
 // Populate Wishlist User

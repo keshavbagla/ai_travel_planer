@@ -9,9 +9,9 @@ import {
     filterReviews,
     updateReview,
     deleteReview,
-} from "../controllers/review.controllers.js";
+} from "../controllers/review.controller.js";
 
-import { verifyJWT } from "../middlewares/auth.middlewares.js";
+import { verifyJWT } from "../middlewares/auth.middleware.js";
 
 const router = Router();
 
