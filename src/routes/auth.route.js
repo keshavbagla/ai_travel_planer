@@ -25,12 +25,15 @@ import { uploadProfileImage } from "../controllers/auth.controller.js";
 
 const router = Router();
 
+
 router.post("/register", registerUser);
 
 router.post(
     "/verify-otp",
     verifyOTP
 );
+
+router.post("/resend-otp", resendOTP);
 
 router.post("/login", loginUser);
 
@@ -53,6 +56,8 @@ router.post(
     "/reset-password",
     resetPassword
 );
+
+// Protected Routes
 
 router.post(
     "/logout",

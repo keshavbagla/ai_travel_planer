@@ -54,6 +54,7 @@ const bookingSchema = new Schema(
             enum: [
                 "Flight",
                 "Hotel",
+                "Restaurant",
                 "Activity",
             ],
             required: true,
@@ -69,8 +70,9 @@ const bookingSchema = new Schema(
         itemModel: {
             type: String,
             enum: [
-                "Flight",
+                "FlightOffer",
                 "Hotel",
+                "Restaurant",
                 "Activity",
             ],
             required: true,
@@ -91,6 +93,14 @@ const bookingSchema = new Schema(
         providerBookingId: {
             type: String,
             default: "",
+            trim: true,
+        },
+        
+        bookingReference: {
+            type: String,
+            required: true,
+            unique: true,
+            index: true,
             trim: true,
         },
 
@@ -115,6 +125,7 @@ const bookingSchema = new Schema(
                 "Selected",
                 "BookingInitiated",
                 "Redirected",
+                "Unknown",
                 "Confirmed",
                 "Cancelled",
                 "Failed",
@@ -221,8 +232,6 @@ bookingSchema.index({
     providerBookingId: 1,
 });
 
-// Virtual
-
 bookingSchema.virtual(
     "totalTravelers"
 ).get(function () {
@@ -236,7 +245,6 @@ bookingSchema.virtual(
         (this.travelers.infants || 0)
     );
 });
-
 
 bookingSchema.set(
     "toJSON",
@@ -253,6 +261,7 @@ bookingSchema.set(
         versionKey: false,
     }
 );
+
 
 export const Booking = mongoose.model(
     "Booking",

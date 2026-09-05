@@ -1,23 +1,25 @@
-import {
-    Router,
-} from "express";
+import { Router } from "express";
+import { verifyJWT } from "../middlewares/auth.middleware.js";
+import { upload } from "../middlewares/multer.middleware.js";
 
 import {
-    searchPlaces,
-    getPlaceDetails,
+    uploadImageController,
+    deleteImageController,
 } from "../controllers/image.controller.js";
 
-const router =
-    Router();
+const router = Router();
 
-router.get(
-    "/search",
-    searchPlaces
+router.post(
+    "/upload",
+    verifyJWT,
+    upload.single("image"),
+    uploadImageController
 );
 
-router.get(
-    "/:placeId",
-    getPlaceDetails
+router.delete(
+    "/",
+    verifyJWT,
+    deleteImageController
 );
 
 export default router;

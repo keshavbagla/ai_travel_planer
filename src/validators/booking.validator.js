@@ -1,7 +1,6 @@
 import mongoose from "mongoose";
 import { ApiError } from "../utils/ApiError.js";
 
-
 const validateCreateBooking = (data) => {
     const {
         user,
@@ -46,6 +45,8 @@ const validateCreateBooking = (data) => {
         );
     }
 
+    // Trip
+
     if (!trip) {
         throw new ApiError(
             400,
@@ -64,6 +65,8 @@ const validateCreateBooking = (data) => {
         );
     }
 
+    // Booking Type
+
     if (!type) {
         throw new ApiError(
             400,
@@ -75,6 +78,7 @@ const validateCreateBooking = (data) => {
         ![
             "Flight",
             "Hotel",
+            "Restaurant",
             "Activity",
         ].includes(type)
     ) {
@@ -115,8 +119,9 @@ const validateCreateBooking = (data) => {
 
     if (
         ![
-            "Flight",
+            "FlightOffer",
             "Hotel",
+            "Restaurant",
             "Activity",
         ].includes(itemModel)
     ) {
@@ -128,10 +133,20 @@ const validateCreateBooking = (data) => {
 
     // Type and Item Model must match
 
-    if (type !== itemModel) {
+    const validTypeModelPairs = {
+        Flight: "FlightOffer",
+        Hotel: "Hotel",
+        Restaurant: "Restaurant",
+        Activity: "Activity",
+    };
+
+    if (
+        validTypeModelPairs[type] !==
+        itemModel
+    ) {
         throw new ApiError(
             400,
-            "Booking type and item model must match."
+            "Booking type and item model do not match."
         );
     }
 
@@ -369,6 +384,7 @@ const validateUpdateBooking = (data) => {
         ![
             "Flight",
             "Hotel",
+            "Restauurant",
             "Activity",
         ].includes(data.type)
     ) {
@@ -397,8 +413,9 @@ const validateUpdateBooking = (data) => {
     if (
         data.itemModel &&
         ![
-            "Flight",
+            "FlightOffer",
             "Hotel",
+            "Restaurant",
             "Activity",
         ].includes(
             data.itemModel
@@ -412,15 +429,22 @@ const validateUpdateBooking = (data) => {
 
     // Type and Item Model
 
+    const validTypeModelPairs = {
+        Flight: "FlightOffer",
+        Hotel: "Hotel",
+        Restaurant: "Restaurant",
+        Activity: "Activity",
+    };
+
     if (
         data.type &&
         data.itemModel &&
-        data.type !==
+        validTypeModelPairs[data.type] !==
             data.itemModel
     ) {
         throw new ApiError(
             400,
-            "Booking type and item model must match."
+            "Booking type and item model do not match."
         );
     }
 
@@ -516,8 +540,6 @@ const validateUpdateBooking = (data) => {
         }
     }
 
-    // Dates
-
     if (
         data.startDate &&
         isNaN(
@@ -558,14 +580,13 @@ const validateUpdateBooking = (data) => {
         );
     }
 
-    // Status
-
     if (
         data.status &&
         ![
             "Selected",
             "BookingInitiated",
             "Redirected",
+            "Unknown",
             "Confirmed",
             "Cancelled",
             "Failed",
@@ -580,8 +601,6 @@ const validateUpdateBooking = (data) => {
     }
 };
 
-// Cancel Booking Validation
-
 const validateCancelBooking = (
     cancellationReason
 ) => {
@@ -594,8 +613,6 @@ const validateCancelBooking = (
         );
     }
 };
-
-// Booking ID Validation
 
 const validateBookingId = (
     bookingId
@@ -619,8 +636,6 @@ const validateBookingId = (
         );
     }
 };
-
-// Export
 
 export {
     validateCreateBooking,

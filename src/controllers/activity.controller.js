@@ -1,4 +1,5 @@
 import { activityService } from "../services/activity.service.js";
+import { ApiError } from "../utils/ApiError.js";
 import {
     validateCreateActivity,
     validateUpdateActivity,
@@ -72,6 +73,8 @@ const getAllActivities = asyncHandler(async (req, res) => {
     );
 });
 
+// Get Activity By ID
+
 const getActivityById = asyncHandler(async (req, res) => {
     const { activityId } =
         req.params;
@@ -94,8 +97,6 @@ const getActivityById = asyncHandler(async (req, res) => {
     );
 });
 
-// Search Activities
-
 const searchActivities = asyncHandler(async (req, res) => {
     const activities =
         await activityService.searchActivities(
@@ -110,7 +111,6 @@ const searchActivities = asyncHandler(async (req, res) => {
         )
     );
 });
-
 
 const searchExternalActivities =
     asyncHandler(async (req, res) => {
@@ -160,8 +160,6 @@ const saveExternalActivity =
         );
 });
 
-// Filter Activities
-
 const filterActivities = asyncHandler(async (req, res) => {
     const activities =
         await activityService.filterActivities(
@@ -176,8 +174,6 @@ const filterActivities = asyncHandler(async (req, res) => {
         )
     );
 });
-
-// Update Activity
 
 const updateActivity = asyncHandler(async (req, res) => {
     if(req.body.location){
@@ -235,8 +231,6 @@ const updateActivity = asyncHandler(async (req, res) => {
         )
     );
 });
-
-// Delete Activity
 
 const deleteActivity = asyncHandler(async (req, res) => {
     const { activityId } =
