@@ -4,7 +4,7 @@ import { Trip } from "../models/trip.model.js";
 import { Hotel } from "../models/hotel.model.js";
 import { Activity } from "../models/activity.model.js";
 import { Restaurant } from "../models/restaurant.model.js";
-import { FlightOffer } from "../models/flightOffer.model.js";
+import { FlightOffer } from "../models/flight.model.js";
 import { Traveler } from "../models/traveler.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { generateBookingReference } from "../utils/generateBookingReference.js";
