@@ -1,23 +1,21 @@
-import dotenv from "dotenv";
-
-dotenv.config({
-    path: "./.env",
-});
+import "dotenv/config";
 
 import connectDB from "./src/db/index.js";
 import { app } from "./src/app.js";
 
 const PORT = process.env.PORT || 8001;
 
-import { emailService } from "./src/services/email.service.js";
-
 connectDB()
-    .then(async () => {
-
-        await emailService.verifyTransporter();
-
-        app.listen(PORT, () => {
+    .then(() => {
+        app.listen(PORT, "0.0.0.0", () => {
             console.log(`Server running on ${PORT}`);
         });
+    })
+    .catch((error) => {
+        console.error(
+            "❌ MongoDB connection failed:",
+            error.message
+        );
 
+        process.exit(1);
     });

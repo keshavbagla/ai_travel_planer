@@ -1,72 +1,54 @@
-import nodemailer from "nodemailer";
-
+import { Resend } from "resend";
 import { ApiError } from "../utils/ApiError.js";
 
-const createTransporter = () => {
-    return nodemailer.createTransport({
-        host: process.env.MAIL_HOST,
-        port: Number(process.env.MAIL_PORT),
-        secure: process.env.MAIL_SECURE === "true",
+const resend = new Resend(process.env.RESEND_API_KEY);
 
-        family: 4,
+const FROM_EMAIL = "onboarding@resend.dev";
 
-        connectionTimeout: 30000,
-        greetingTimeout: 30000,
-        socketTimeout: 30000,
-
-        auth: {
-            user: process.env.MAIL_USER,
-            pass: process.env.MAIL_PASSWORD,
-        },
-    });
-};
-
-const verifyTransporter = async () => {
-    try {
-        const transporter = createTransporter();
-
-        await transporter.verify();
-
-        console.log("✅ Email server connected successfully.");
-
-        transporter.close();
-    } catch (error) {
-        console.error("❌ Email server connection failed.");
-        console.error(error);
-    }
-};
+console.log("📧 RESEND FROM EMAIL:", FROM_EMAIL);
 
 const sendEmail = async ({
     to,
     subject,
     html,
-    text = "",
+    text,
 }) => {
     try {
-        const transporter = createTransporter();
+        if (!process.env.RESEND_API_KEY) {
+            throw new Error("RESEND_API_KEY is not configured");
+        }
 
-        const info = await transporter.sendMail({
-            from: process.env.MAIL_FROM,
-            to,
+        const { data, error } = await resend.emails.send({
+            from: FROM_EMAIL,
+            to: [to],
             subject,
-            text,
             html,
+            text,
         });
 
-        transporter.close();
+        if (error) {
+            console.error("❌ Email sending failed:", error);
 
-        console.log(`✅ Email sent successfully to: ${to}`);
-        console.log(`📧 Message ID: ${info.messageId}`);
+            throw new Error(
+                error.message || "Failed to send email"
+            );
+        }
+
+        console.log(
+            "✅ Email sent successfully:",
+            data?.id
+        );
 
         return {
             success: true,
-            messageId: info.messageId,
-            accepted: info.accepted,
-            rejected: info.rejected,
-            response: info.response,
+            messageId: data?.id,
         };
     } catch (error) {
-        console.error("❌ Email Error:", error);
+        console.error("Email Error:", error);
+
+        if (error instanceof ApiError) {
+            throw error;
+        }
 
         throw new ApiError(
             500,
@@ -92,29 +74,37 @@ If you didn't request this, please ignore this email.
 
     const html = `
         <div style="font-family:Arial,sans-serif;padding:20px">
+
             <h2>AI Travel Planner</h2>
 
-            <p>Your OTP for <strong>${purpose}</strong> is:</p>
+            <p>
+                Your OTP for
+                <strong>${purpose}</strong>
+                is:
+            </p>
 
             <h1 style="letter-spacing:4px">
                 ${otp}
             </h1>
 
             <p>
-                This OTP is valid for <strong>5 minutes</strong>.
+                This OTP is valid for
+                <strong>5 minutes</strong>.
             </p>
 
             <p>
-                If you didn't request this, please ignore this email.
+                If you didn't request this,
+                please ignore this email.
             </p>
+
         </div>
     `;
 
     return await sendEmail({
         to: email,
         subject,
-        text,
         html,
+        text,
     });
 };
 
@@ -124,6 +114,7 @@ const sendWelcomeEmail = async ({
 }) => {
     const html = `
         <div style="font-family:Arial,sans-serif;padding:20px">
+
             <h2>Welcome ${fullName} 🎉</h2>
 
             <p>
@@ -134,6 +125,7 @@ const sendWelcomeEmail = async ({
                 Start exploring amazing destinations
                 with AI-powered planning.
             </p>
+
         </div>
     `;
 
@@ -162,13 +154,21 @@ const sendBookingConfirmation = async ({
 }) => {
     const html = `
         <div style="font-family:Arial;padding:20px">
+
             <h2>Booking Confirmed ✅</h2>
 
-            <p>Trip : ${tripName}</p>
+            <p>
+                Trip : ${tripName}
+            </p>
 
-            <p>Booking ID : ${bookingNumber}</p>
+            <p>
+                Booking ID : ${bookingNumber}
+            </p>
 
-            <p>Have a wonderful journey.</p>
+            <p>
+                Have a wonderful journey.
+            </p>
+
         </div>
     `;
 
@@ -186,11 +186,17 @@ const sendPaymentReceipt = async ({
 }) => {
     const html = `
         <div style="font-family:Arial;padding:20px">
+
             <h2>Payment Successful</h2>
 
-            <p>Amount : ₹${amount}</p>
+            <p>
+                Amount : ₹${amount}
+            </p>
 
-            <p>Transaction ID : ${transactionId}</p>
+            <p>
+                Transaction ID : ${transactionId}
+            </p>
+
         </div>
     `;
 
@@ -208,11 +214,17 @@ const sendTripReminder = async ({
 }) => {
     const html = `
         <div style="font-family:Arial;padding:20px">
+
             <h2>Your Trip Starts Soon ✈️</h2>
 
-            <p>${tripTitle}</p>
+            <p>
+                ${tripTitle}
+            </p>
 
-            <p>${startDate}</p>
+            <p>
+                ${startDate}
+            </p>
+
         </div>
     `;
 
@@ -236,7 +248,6 @@ const sendCustomEmail = async ({
 };
 
 export const emailService = {
-    verifyTransporter,
     sendEmail,
     sendOTP,
     sendWelcomeEmail,
@@ -246,4 +257,3 @@ export const emailService = {
     sendTripReminder,
     sendCustomEmail,
 };
-

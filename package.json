@@ -24,7 +24,7 @@
     "morgan": "^1.11.0",
     "multer": "^2.2.0",
     "node": "^26.5.1",
-    "nodemailer": "^9.0.4",
+    "resend": "^6.26.0",
     "serverless-http": "^4.0.0",
     "slugify": "^1.6.9"
   },
