@@ -80,7 +80,6 @@ const registerUser = asyncHandler(async (req, res) => {
     }
   }
 
-
   const user = await User.create({
     fullName,
     email: email?.toLowerCase(),
@@ -103,12 +102,14 @@ const registerUser = asyncHandler(async (req, res) => {
 
   console.log("Registration OTP :", otp);
 
+ 
 
     await emailService.sendOTP({
         email: user.email,
         otp,
         purpose: "Registration"
     });
+   
 
     return res.status(201).json(
         new ApiResponse(
@@ -123,6 +124,7 @@ const registerUser = asyncHandler(async (req, res) => {
         )
     );
 });
+
 
 const verifyOTP = asyncHandler(async (req, res) => {
 
@@ -192,6 +194,7 @@ const verifyOTP = asyncHandler(async (req, res) => {
     );
 
 });  
+
 
 const resendOTP = asyncHandler(async (req, res) => {
 
@@ -736,6 +739,7 @@ const changeCurrentPassword = asyncHandler(async (req, res) => {
     );
 });
 
+
 const updateAccountDetails = asyncHandler(async (req, res) => {
     const {
         fullName,
@@ -792,8 +796,6 @@ const updateAccountDetails = asyncHandler(async (req, res) => {
 
 });
 
-// Get current user
-
 const getCurrentUser = asyncHandler(async (req, res) => {
     return res.status(200).json(
         new ApiResponse(
@@ -803,8 +805,6 @@ const getCurrentUser = asyncHandler(async (req, res) => {
         )
     );
 });
-
-// Upload Profile Image
 
 const uploadProfileImage = asyncHandler(async (req, res) => {
     console.log("req.file:", req.file);
@@ -824,8 +824,6 @@ const uploadProfileImage = asyncHandler(async (req, res) => {
     }
 
     const user = await User.findById(req.user._id);
-
-    // Delete old image if it exists
 
     if (user.profileImagePublicId) {
         await deleteFromCloudinary(user.profileImagePublicId);
