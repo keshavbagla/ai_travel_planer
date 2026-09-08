@@ -1,50 +1,46 @@
-import { Resend } from "resend";
+import { BrevoClient } from "@getbrevo/brevo";
 import { ApiError } from "../utils/ApiError.js";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const brevo = new BrevoClient({
+    apiKey: process.env.BREVO_API_KEY,
+});
 
-const FROM_EMAIL = "onboarding@resend.dev";
+const FROM_EMAIL = process.env.BREVO_FROM_EMAIL;
+const FROM_NAME = process.env.BREVO_FROM_NAME || "AI Travel Planner";
 
-console.log("📧 RESEND FROM EMAIL:", FROM_EMAIL);
-
-const sendEmail = async ({
-    to,
-    subject,
-    html,
-    text,
-}) => {
+const sendEmail = async ({ to, subject, html, text }) => {
     try {
-        if (!process.env.RESEND_API_KEY) {
-            throw new Error("RESEND_API_KEY is not configured");
+        if (!process.env.BREVO_API_KEY) {
+            throw new Error("BREVO_API_KEY is not configured");
         }
 
-        const { data, error } = await resend.emails.send({
-            from: FROM_EMAIL,
-            to: [to],
+        if (!FROM_EMAIL) {
+            throw new Error("BREVO_FROM_EMAIL is not configured");
+        }
+
+        const result = await brevo.transactionalEmails.sendTransacEmail({
+            sender: {
+                name: FROM_NAME,
+                email: FROM_EMAIL,
+            },
+            to: [
+                {
+                    email: to,
+                },
+            ],
             subject,
-            html,
-            text,
+            htmlContent: html,
+            textContent: text,
         });
 
-        if (error) {
-            console.error("❌ Email sending failed:", error);
-
-            throw new Error(
-                error.message || "Failed to send email"
-            );
-        }
-
-        console.log(
-            "✅ Email sent successfully:",
-            data?.id
-        );
+        console.log("✅ Email sent successfully:", result.messageId);
 
         return {
             success: true,
-            messageId: data?.id,
+            messageId: result.messageId,
         };
     } catch (error) {
-        console.error("Email Error:", error);
+        console.error("❌ Brevo Email Error:", error);
 
         if (error instanceof ApiError) {
             throw error;
@@ -52,7 +48,7 @@ const sendEmail = async ({
 
         throw new ApiError(
             500,
-            error.message || "Failed to send email"
+            error?.message || "Failed to send email"
         );
     }
 };
