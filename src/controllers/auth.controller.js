@@ -31,9 +31,17 @@ const generateAccessAndRefreshTokens = async (userId) => {
     };
   }
 
-  catch(error){
-    throw new ApiError(500, "Failed to generate authentication tokens");
-  }
+   catch (error) {
+    console.error("========== TOKEN GENERATION ERROR ==========");
+    console.error("Message:", error.message);
+    console.error("Stack:", error.stack);
+    console.error("============================================");
+
+    throw new ApiError(
+        500,
+        "Failed to generate authentication tokens"
+    );
+}
 };
 
 
