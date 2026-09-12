@@ -232,8 +232,6 @@ const searchDestinations = asyncHandler(async (req, res) => {
     );
 });
 
-
-
 const filterDestinations = asyncHandler(async (req, res) => {
     const destinations =
         await destinationService.filterDestinations(req.query);

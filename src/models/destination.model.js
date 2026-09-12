@@ -2,19 +2,63 @@ import mongoose, { Schema } from "mongoose";
 
 const airportSchema = new Schema(
   {
-    airportName: String,
-    airportCode: String,
-    distance: Number,
+    airportName: {
+      type: String,
+      trim: true,
+    },
+
+    airportCode: {
+      type: String,
+      trim: true,
+      uppercase: true,
+    },
+
+    icao: {
+      type: String,
+      trim: true,
+      uppercase: true,
+    },
+
+    city: {
+      type: String,
+      trim: true,
+    },
+
+    countryCode: {
+      type: String,
+      trim: true,
+      uppercase: true,
+    },
+
+    latitude: {
+      type: Number,
+    },
+
+    longitude: {
+      type: Number,
+    },
+
+    distance: {
+      type: Number,
+    },
+
+    type: {
+      type: String,
+      enum: [
+        "large_airport",
+        "medium_airport",
+        "small_airport",
+      ],
+    },
   },
   {
     _id: false,
   }
 );
 
-// Destination Schema
-
 const destinationSchema = new Schema(
   {
+
     name: {
       type: String,
       required: true,
@@ -44,7 +88,7 @@ const destinationSchema = new Schema(
 
     destinationCode: {
       type: String,
-      unique: true,
+      trim: true,
       uppercase: true,
     },
 
@@ -55,14 +99,10 @@ const destinationSchema = new Schema(
       trim: true,
     },
 
-    // Description
-
     description: {
       type: String,
       trim: true,
     },
-
-    // Destination Categories
 
     destinationType: [
       {
@@ -116,8 +156,6 @@ const destinationSchema = new Schema(
       type: String,
       default: ""
     },
-
-    // Geo Location
     
     geoapifyPlaceId: {
         type: String,
@@ -142,15 +180,13 @@ const destinationSchema = new Schema(
         default: "Point"
       },
       coordinates: {
-        type: [Number], 
+        type: [Number],
         required: true
       }
     },
 
     timezone: String,
     nearbyAirports: [airportSchema],
-
-    // Climate
 
     climate: {
       averageTemperature: Number,
@@ -163,8 +199,6 @@ const destinationSchema = new Schema(
     bestMonths: [
       String
     ],
-
-    // Budget
     
     averageDailyBudget: {
       budget: Number,
@@ -177,8 +211,6 @@ const destinationSchema = new Schema(
       default: "INR"
     },
 
-    // Activities
-
     popularActivities: [
       String
     ],
@@ -186,9 +218,6 @@ const destinationSchema = new Schema(
     famousFor: [
       String
     ],
-
-    // Suitable For
-  
     suitableFor: [
       {
         type: String,
@@ -216,8 +245,6 @@ const destinationSchema = new Schema(
         ]
       }
     ],
-
-    // Attractions
     
     activities: [
       {
@@ -225,8 +252,6 @@ const destinationSchema = new Schema(
         ref: "Activity"
       }
     ],    
-
-    // Restaurants
     
     restaurants: [
       {
@@ -234,8 +259,6 @@ const destinationSchema = new Schema(
         ref: "Restaurant"
       }
     ],
-
-    // Hotels
     
     hotels: [
       {
@@ -244,8 +267,6 @@ const destinationSchema = new Schema(
       }
     ],
 
-    // Transport
-
     transportation: {
       airportTransfer: Boolean,
       metro: Boolean,
@@ -253,8 +274,6 @@ const destinationSchema = new Schema(
       taxi: Boolean,
       bikeRental: Boolean
     },
-
-    // Travel Information
 
     primaryAirportIata: {
       type: String,
@@ -303,8 +322,6 @@ const destinationSchema = new Schema(
       }
     ],
 
-    // AI Scores
-
     aiScores: {
       family: {
         type: Number,
@@ -336,8 +353,6 @@ const destinationSchema = new Schema(
         default: 0
       }
     },
-
-    // Ratings
     
     averageRating: {
       type: Number,
@@ -350,8 +365,6 @@ const destinationSchema = new Schema(
       type: Number,
       default: 0
     },
-
-    // Images
     
     coverImage: {
       url: {
@@ -389,8 +402,6 @@ const destinationSchema = new Schema(
       }
     ],
     
-    // Status
-    
     isActive: {
       type: Boolean,
       default: true
@@ -401,7 +412,10 @@ const destinationSchema = new Schema(
   }
 );
 
-// Indexes
+destinationSchema.index(
+    { destinationCode: 1 },
+    { unique: true, sparse: true }
+);
 
 destinationSchema.index({
     averageRating: -1
@@ -437,8 +451,6 @@ destinationSchema.set("toJSON", {
 destinationSchema.set("toObject", {
     versionKey: false,
 });
-
-// Model
 
 export const Destination = mongoose.model(
   "Destination",

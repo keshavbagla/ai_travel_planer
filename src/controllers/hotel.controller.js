@@ -60,7 +60,6 @@ const createHotel = asyncHandler(async (req, res) => {
     );
 });
 
-
 const getAllHotels = asyncHandler(async (req, res) => {
     const hotels =
         await hotelService.getAllHotels(req.query);
@@ -159,11 +158,12 @@ const searchExternalHotels =
 
 const saveExternalHotel =
     asyncHandler(async (req, res) => {
-        const hotel =
-            await hotelService.saveExternalHotel({
-                hotelData: req.body,
-            });
-
+        const hotel = await hotelService.saveExternalHotel({
+            hotelData: req.body,
+            trip: req.body.trip,
+            user: req.user._id,
+        });
+        
         return res.status(200).json(
             new ApiResponse(
                 200,
@@ -209,7 +209,6 @@ const filterHotels = asyncHandler(async (req, res) => {
         )
     );
 });
-
 
 const updateHotel = asyncHandler(async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(req.params.hotelId)) {

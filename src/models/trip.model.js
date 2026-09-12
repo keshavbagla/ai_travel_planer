@@ -1,7 +1,5 @@
 import mongoose, { Schema } from "mongoose";
 
-// Travelers Schema
-
 const travelersSchema = new Schema(
     {
         adults: {
@@ -26,8 +24,6 @@ const travelersSchema = new Schema(
         _id: false,
     }
 );
-
-// Budget Schema
 
 const budgetSchema = new Schema(
     {
@@ -143,6 +139,101 @@ const selectedFlightSchema = new Schema(
             type: String,
             default: "",
         },
+        status: {
+            type: String,
+            enum: [
+                "Pending",
+                "Booked",
+                "Cancelled",
+            ],
+            default: "Pending",
+        },
+    },
+    {
+        _id: false,
+    }
+);
+
+// Selected Hotel Schema
+
+const selectedHotelSchema = new Schema(
+    {
+        hotel: {
+            type: Schema.Types.ObjectId,
+            ref: "Hotel",
+            default: null,
+        },
+
+        name: {
+            type: String,
+            default: "",
+        },
+
+        externalHotelId: {
+            type: String,
+            default: "",
+        },
+
+        checkIn: {
+            type: Date,
+            default: null,
+        },
+
+        checkOut: {
+            type: Date,
+            default: null,
+        },
+
+        nights: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
+
+        rooms: {
+            type: Number,
+            default: 1,
+            min: 1,
+        },
+
+        guests: {
+            type: Number,
+            default: 1,
+            min: 1,
+        },
+
+        pricePerNight: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
+
+        totalPrice: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
+
+        currency: {
+            type: String,
+            default: "INR",
+        },
+
+        provider: {
+            type: String,
+            default: "",
+        },
+
+        bookingUrl: {
+            type: String,
+            default: "",
+        },
+
+        bookingReference: {
+            type: String,
+            default: "",
+        },
+
         status: {
             type: String,
             enum: [
@@ -291,8 +382,6 @@ const tripSchema = new Schema(
       },
     ],
 
-    // Tavel Dates
-
     startDate: {
       type: Date,
       required: true,
@@ -309,7 +398,6 @@ const tripSchema = new Schema(
       min: 1,
     },
 
-    // Travelers
 
     travelers: {
       type: travelersSchema,
@@ -317,32 +405,27 @@ const tripSchema = new Schema(
       required: true,
     },
 
-    // Budget
-
     budget: {
       type: budgetSchema,
       default: () => ({}),
     },
-
-    // Preferences
 
     preferences: {
       type: preferencesSchema,
       default: () => ({}),
     },
 
-    // Selected Flight
-
     selectedFlight: {
       type: selectedFlightSchema,
       default: null,
     },
 
-    // Day-wise Itinerary
+    selectedHotel: {
+      type: selectedHotelSchema,
+      default: null,
+    },
 
     itinerary: [itineraryDaySchema,],
-
-    // AI Information
 
     isAIGenerated: {
       type: Boolean,
@@ -359,8 +442,6 @@ const tripSchema = new Schema(
       default: "",
     },
 
-    // Status
-
     status: {
       type: String,
       enum: [
@@ -371,8 +452,6 @@ const tripSchema = new Schema(
       ],
       default: "Planning",
     },
-
-    // Statistics
 
     statistics: {
       totalViews: {
@@ -412,8 +491,6 @@ const tripSchema = new Schema(
     timestamps: true,
   }
 );
-
-// Indexes
 
 tripSchema.index({
     user: 1,

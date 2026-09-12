@@ -6,6 +6,7 @@ import {
     googleFlightsProvider,
 } from "./googleFlightProvider.service.js";
 
+
 const parseProviderDate = (value) => {
     if (!value) {
         return null;
@@ -104,10 +105,6 @@ const parseProviderDate = (value) => {
     return null;
 };
 
-/**
- * Normalize one Google Flights itinerary
- * into our FlightOffer schema.
- */
 const normalizeFlightOffer = ({
     itinerary,
     user,
@@ -281,19 +278,6 @@ const normalizeFlightOffer = ({
               )
             : [];
 
-    /**
-     * IMPORTANT:
-     * Do not trust itinerary.stops blindly.
-     *
-     * Example:
-     * DEL → BAH → CDG
-     *
-     * flights.length = 2
-     * layovers.length = 1
-     *
-     * Therefore:
-     * stops = 1
-     */
     const stops = Math.max(
         flights.length - 1,
         layovers.length
@@ -433,7 +417,6 @@ const normalizeFlightOffer = ({
         isActive: true,
     };
 };
-
 
 const searchAndSaveFlightOffers =
     async ({
@@ -598,22 +581,63 @@ const selectFlightOffer =
         }
 
         if (trip) {
-            const tripDocument =
-                await Trip.findOne({
-                    _id: trip,
-                    user,
-                    isActive: true,
-                });
+            const tripDocument = await Trip.findOne({
+                _id: trip,
+                user,
+                isActive: true,
+            }).populate(
+                "destination",
+                "name city country primaryAirportIata nearbyAirports"
+            );
 
             if (!tripDocument) {
+                throw new ApiError(404, "Trip not found.");
+            }
+
+            const destinationAirport =
+                tripDocument.destination?.primaryAirportIata;
+
+            if (!destinationAirport) {
                 throw new ApiError(
-                    404,
-                    "Trip not found."
+                    400,
+                    "Primary airport is not configured for this trip destination."
                 );
             }
 
-            offer.trip =
-                tripDocument._id;
+            if (
+                offer.arrivalAirport?.toUpperCase() !==
+                destinationAirport.toUpperCase()
+            ) {
+                throw new ApiError(
+                    400,
+                    `Selected flight does not arrive at the trip destination airport (${destinationAirport}).`
+                );
+            }
+
+            offer.trip = tripDocument._id;
+
+            const firstFlight = offer.flights?.[0];
+
+            tripDocument.selectedFlight = {
+                airline: firstFlight?.airline || "",
+                flightNumber: firstFlight?.flightNumber || "",
+                departureAirport: offer.departureAirport,
+                arrivalAirport: offer.arrivalAirport,
+                departureTime: offer.departureTime,
+                arrivalTime: offer.arrivalTime,
+                cabinClass: "Economy",
+                passengers:
+                    tripDocument.travelers?.adults ||
+                    1,
+                duration: offer.durationText || "",
+                price: offer.price,
+                currency: offer.currency,
+                provider: offer.provider,
+                bookingReference: "",
+                status: "Pending",
+            };
+
+            await tripDocument.save();
         }
 
         await FlightOffer.updateMany(
@@ -737,6 +761,7 @@ const getSelectedFlightBookingUrl =
                 "Provider booking token was not returned."
             );
         }
+
         return await googleFlightsProvider
             .getBookingUrl(
                 providerToken

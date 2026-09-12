@@ -7,15 +7,16 @@ import { Activity } from "../models/activity.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { generateSlug } from "../utils/generateSlug.js";
 
+
 const populateTrip = (query) => {
     return query
         .populate(
             "user",
-            "fullName username email avatar"
+            "fullName email avatar"
         )
         .populate(
             "destination",
-            "name city state country slug"
+            "name city state country slug primaryAirportIata nearbyAirports"
         )
         .populate(
             "hotel",
@@ -33,7 +34,7 @@ const populateTrip = (query) => {
 
 const validateReferences = async (
     tripData
-) => {    
+) => {   
 
     const user =
         await User.findById(
@@ -138,8 +139,6 @@ const createTrip = async (
         destination.city,
         destination.country
     );
-
-    // Create Trip
 
     const trip =
         await Trip.create({

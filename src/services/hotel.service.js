@@ -2,6 +2,7 @@ import slugify from "slugify";
 import { Hotel } from "../models/hotel.model.js";
 import axios from "axios";
 import { Destination } from "../models/destination.model.js";
+import { Trip } from "../models/trip.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import {
     uploadOnCloudinary,
@@ -197,13 +198,15 @@ const normalizeExternalHotel = ({
 
                 const providerTotal =
                     Number(
-                        hotel.price.total ??
+                        hotel.price?.totalPrice ??
+                        hotel.price?.total ??
                         0
                     );
 
                 const taxes =
                     Number(
-                        hotel.price.taxes ??
+                        hotel.price?.fees?.taxes ??
+                        hotel.price?.taxes ??
                         0
                     );
 
@@ -234,8 +237,6 @@ const normalizeExternalHotel = ({
     };
 };
 
-// Generate Slug
-
 const generateSlug = (
     name,
     city,
@@ -251,7 +252,6 @@ const generateSlug = (
     );
 };
 
-// Upload Gallery Images
 
 const uploadGalleryImages = async (
     files = []
@@ -282,8 +282,6 @@ const uploadGalleryImages = async (
     return uploadedImages;
 };
 
-// Delete Gallery Images
-
 const deleteGalleryImages = async (
     images = []
 ) => {
@@ -295,9 +293,6 @@ const deleteGalleryImages = async (
         }
     }
 };
-
-// Create Hotel
-
 const createHotel = async ({
     hotelData,
     coverImage,
@@ -314,8 +309,6 @@ const createHotel = async ({
       );
     }
     
-    // Verify Destination
-    
     if (hotelData.destination) {
         const destination = await Destination.findById(
             hotelData.destination
@@ -329,15 +322,11 @@ const createHotel = async ({
         }
     }
 
-    // Generate Slug
-
     const slug = generateSlug(
         hotelData.name,
         hotelData.city,
         hotelData.country
     );
-
-    // Duplicate Check
 
     const existingHotel =
         await Hotel.findOne({
@@ -355,7 +344,6 @@ const createHotel = async ({
     let uploadedGalleryImages = [];
 
     try {
-        // Upload Cover Image
 
         if (coverImage) {
             const response =
@@ -379,16 +367,12 @@ const createHotel = async ({
 
         }
 
-        // Upload Gallery Images
-
         if (galleryImages.length > 0) {
             uploadedGalleryImages =
                 await uploadGalleryImages(
                     galleryImages
                 );
         }
-
-        // Create Hotel
 
         const hotel =
             await Hotel.create({
@@ -403,7 +387,6 @@ const createHotel = async ({
         return hotel;
     }
     catch (error) {
-      // Rollback Cover Image
       
         if (
             uploadedCoverImage?.publicId
@@ -412,8 +395,6 @@ const createHotel = async ({
                 uploadedCoverImage.publicId
             );
         }
-
-        // Rollback Gallery Images
         
         await deleteGalleryImages(
             uploadedGalleryImages
@@ -422,8 +403,6 @@ const createHotel = async ({
         throw error;
     }
 };
-
-// Get All Hotels
 
 const getAllHotels = async ({
     page = 1,
@@ -446,8 +425,6 @@ const getAllHotels = async ({
     const query = {
         isActive: true,
     };
-
-    // Search
 
     if (search) {
         query.$or = [
@@ -477,8 +454,6 @@ const getAllHotels = async ({
             },
         ];
     }
-
-    // Filters
   
     if (destination) {
         query.destination = destination;
@@ -609,8 +584,6 @@ const getAllHotels = async ({
     };
 };
 
-// Get Hotel By ID
-
 const getHotelById = async (
     hotelId
 ) => {
@@ -638,8 +611,6 @@ const getHotelById = async (
 
     return hotel;
 };
-
-// Search Hotels
 
 const searchHotels = async (
     keyword
@@ -840,34 +811,18 @@ const searchExternalHotels = async ({
                 "/v1/search",
                 {
                     params: {
-                        location:
-                            `${destination.city}, ${destination.country}`,
-
+                        location: `${destination.city}, ${destination.country}`,
                         checkIn,
-
                         checkOut,
-
-                        adults:
-                            Number(adults),
-
+                        adults: Number(adults),
                         children: 0,
-
-                        platforms:
-                            "booking",
-
-                        limit: Math.min(
-                            Number(limit) || 20,
-                            50
-                        ),
+                        platforms: "airbnb,booking",
+                        limit: Math.min(Number(limit) || 20, 50),
                     },
                 }
             );
 
         let providerResult;
-
-        // -----------------------------------
-        // Handle asynchronous StayingAPI job
-        // -----------------------------------
 
         if (
             response.status === 202 &&
@@ -884,14 +839,9 @@ const searchExternalHotels = async ({
             );
         }
         else {
-            // Normal synchronous response
             providerResult =
                 response.data;
         }
-
-        // -----------------------------------
-        // Debug provider response
-        // -----------------------------------
 
         console.log(
             "FINAL PROVIDER RESULT:",
@@ -901,10 +851,6 @@ const searchExternalHotels = async ({
                 2
             )
         );
-
-        // -----------------------------------
-        // Extract hotels
-        // -----------------------------------
 
         let hotels = [];
 
@@ -958,18 +904,10 @@ const searchExternalHotels = async ({
             hotels.length
         );
 
-        // -----------------------------------
-        // Metadata
-        // -----------------------------------
-
         const meta =
             providerResult?.meta ||
             providerResult?.data?.meta ||
             {};
-
-        // -----------------------------------
-        // No hotels
-        // -----------------------------------
 
         if (!hotels.length) {
             return {
@@ -979,10 +917,6 @@ const searchExternalHotels = async ({
                     "No hotels found for the selected destination and dates.",
             };
         }
-
-        // -----------------------------------
-        // Normalize hotels
-        // -----------------------------------
 
         const normalizedHotels =
             hotels.map((hotel) => {
@@ -1020,10 +954,6 @@ const searchExternalHotels = async ({
                 };
             });
 
-        // -----------------------------------
-        // Final response
-        // -----------------------------------
-
         return {
             hotels:
                 normalizedHotels,
@@ -1054,9 +984,11 @@ const searchExternalHotels = async ({
 
 const saveExternalHotel = async ({
     hotelData,
+    trip,
+    user,
 }) => {
     const {
-        externalProvider,
+        externalProvider = "StayingAPI",
         externalHotelId,
         externalListingId,
         bookingUrl,
@@ -1072,14 +1004,27 @@ const saveExternalHotel = async ({
         averageRating = 0,
         reviewCount = 0,
         pricePerNight = 0,
-        currency = "EUR",
+        currency = "INR",
         amenities = [],
+        checkIn,
+        checkOut,
+        nights = 0,
+        rooms = 1,
+        guests = 1,
+        totalPrice = 0,
     } = hotelData;
 
     if (!destination) {
         throw new ApiError(
             400,
             "Destination is required."
+        );
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(destination)) {
+        throw new ApiError(
+            400,
+            "Invalid destination ID."
         );
     }
 
@@ -1103,46 +1048,36 @@ const saveExternalHotel = async ({
         );
     }
 
-    const existing =
-        await Hotel.findOne({
-            externalProvider,
-            externalHotelId,
-        });
+    let hotel = await Hotel.findOne({
+        externalProvider,
+        externalHotelId,
+    });
 
-    if (existing) {
-        return existing;
-    }
+    if (!hotel) {
+        const slug = generateSlug(
+            name,
+            city,
+            country
+        );
 
-    const slug = generateSlug(
-        name,
-        city,
-        country
-    );
-
-    const hotel =
-        await Hotel.create({
+        hotel = await Hotel.create({
             name,
             slug,
-
             destination,
-
             address,
             city,
             state,
             country,
-
             location,
-
             hotelType,
 
-            starRating:
-                Math.min(
-                    Math.max(
-                        Number(starRating) || 1,
-                        1
-                    ),
-                    5
+            starRating: Math.min(
+                Math.max(
+                    Number(starRating) || 1,
+                    1
                 ),
+                5
+            ),
 
             averageRating:
                 Number(averageRating) || 0,
@@ -1169,11 +1104,183 @@ const saveExternalHotel = async ({
 
             isActive: true,
         });
+    } else {
+
+        hotel.pricePerNight =
+            Number(pricePerNight) || 0;
+
+        hotel.currency = currency;
+
+        hotel.bookingUrl =
+            bookingUrl ||
+            hotel.bookingUrl ||
+            null;
+
+        hotel.externalListingId =
+            externalListingId ||
+            hotel.externalListingId ||
+            null;
+
+        hotel.averageRating =
+            Number(averageRating) || 0;
+
+        hotel.reviewCount =
+            Number(reviewCount) || 0;
+
+        hotel.amenities =
+            Array.isArray(amenities)
+                ? amenities
+                : hotel.amenities;
+
+        await hotel.save();
+    }
+
+    if (trip) {
+        if (!mongoose.Types.ObjectId.isValid(trip)) {
+            throw new ApiError(
+                400,
+                "Invalid trip ID."
+            );
+        }
+        const tripQuery = {
+            _id: trip,
+            destination,
+            isActive: true,
+        };
+
+        if (user) {
+            tripQuery.user = user;
+        }
+
+        const tripDocument =
+            await Trip.findOne(tripQuery);
+
+        if (!tripDocument) {
+            throw new ApiError(
+                404,
+                "Trip not found or does not belong to this destination."
+            );
+        }
+
+        const selectedCheckIn =
+            checkIn
+                ? new Date(checkIn)
+                : tripDocument.startDate;
+
+        const selectedCheckOut =
+            checkOut
+                ? new Date(checkOut)
+                : tripDocument.endDate;
+
+        if (
+            Number.isNaN(
+                selectedCheckIn?.getTime()
+            ) ||
+            Number.isNaN(
+                selectedCheckOut?.getTime()
+            )
+        ) {
+            throw new ApiError(
+                400,
+                "Invalid hotel check-in or check-out date."
+            );
+        }
+
+        if (
+            selectedCheckOut <=
+            selectedCheckIn
+        ) {
+            throw new ApiError(
+                400,
+                "Hotel check-out date must be after check-in date."
+            );
+        }
+
+        const calculatedNights = Math.max(
+            Math.ceil(
+                (
+                    selectedCheckOut -
+                    selectedCheckIn
+                ) /
+                (1000 * 60 * 60 * 24)
+            ),
+            0
+        );
+
+        const selectedNights =
+            Number(nights) > 0
+                ? Number(nights)
+                : calculatedNights;
+
+        const selectedPricePerNight =
+            Number(pricePerNight) || 0;
+
+        const selectedTotalPrice =
+            Number(totalPrice) > 0
+                ? Number(totalPrice)
+                : selectedPricePerNight *
+                  selectedNights;
+
+        tripDocument.hotel =
+            hotel._id;
+
+        tripDocument.selectedHotel = {
+            hotel: hotel._id,
+
+            name:
+                hotel.name || "",
+
+            externalHotelId:
+                hotel.externalHotelId || "",
+
+            checkIn:
+                selectedCheckIn,
+
+            checkOut:
+                selectedCheckOut,
+
+            nights:
+                selectedNights,
+
+            rooms:
+                Number(rooms) > 0
+                    ? Number(rooms)
+                    : 1,
+
+            guests:
+                Number(guests) > 0
+                    ? Number(guests)
+                    : tripDocument.travelers?.adults ||
+                      1,
+
+            pricePerNight:
+                selectedPricePerNight,
+
+            totalPrice:
+                selectedTotalPrice,
+
+            currency:
+                currency || "INR",
+
+            provider:
+                externalProvider ||
+                "StayingAPI",
+
+            bookingUrl:
+                bookingUrl ||
+                hotel.bookingUrl ||
+                "",
+
+            bookingReference: "",
+
+            status: "Pending",
+        };
+
+        await tripDocument.save();
+    }
 
     return hotel;
 };
-
-// Get Hotel Booking URL
 
 const getHotelBookingUrl = async ({
     hotelId,
@@ -1238,7 +1345,6 @@ const getHotelBookingUrl = async ({
     };
 };
 
-// Filter Hotels
 
 const filterHotels = async ({
     destination,
@@ -1328,8 +1434,6 @@ const filterHotels = async ({
         .lean();
 };
 
-// Update Hotel
-
 const updateHotel = async ({
     hotelId,
     hotelData,
@@ -1351,8 +1455,6 @@ const updateHotel = async ({
             "Hotel not found."
         );
     }
-
-    // Verify Destination (if changed)
 
     if (hotelData.destination) {
         const destination = await Destination.findById(
@@ -1377,7 +1479,6 @@ const updateHotel = async ({
     let uploadedGalleryImages = [];
 
     try {
-        // Upload New Cover Image
 
         if (coverImage) {
             const response =
@@ -1443,6 +1544,7 @@ const updateHotel = async ({
         }
 
         await hotel.save();
+
 
         if (
             coverImage &&
