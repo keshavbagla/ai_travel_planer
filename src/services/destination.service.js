@@ -9,9 +9,9 @@ import {
 } from "../utils/cloudinary.js";
 
 import {
-    geoapifyClient,
-    GEOAPIFY_API_KEY,
-} from "../config/geoapify.js";
+    openTripMapClient,
+    OPENTRIPMAP_API_KEY,
+} from "../config/opentripmap.js";
 
 const generateSlug = (name, city, country) => {
     return slugify(`${name}-${city}-${country}`, {
@@ -340,7 +340,7 @@ const normalizeDestination = (destination) => {
     delete item._id;
     item.description = buildDestinationDescription(item);
     item.placesToVisit = item.placesToVisit || [];
-    item.activities = item.activities || [];
+    item.activities = item.activities || item.popularActivities || [];
     item.hotels = item.hotels || [];
     item.restaurants = item.restaurants || [];
     item.nightlife = item.nightlife || [];
@@ -403,130 +403,191 @@ const searchLocalDestinations = async (
         .lean();
 };
 
+const classifyDestination = ({ name = "", kinds = "", nearbyNames = [] }) => {
+    const source = `${name} ${kinds} ${nearbyNames.join(" ")}`.toLowerCase();
+    const types = [];
+
+    if (/beach|coast|seaside|marine/.test(source)) types.push("Beach");
+    if (/mountain|hill|peak|alpine|cliff/.test(source)) types.push("Mountain");
+    if (/city|urban/.test(source) || types.length === 0) types.push("City");
+    if (/adventure|sport|amusement|theme_park/.test(source)) types.push("Adventure");
+    if (/wildlife|zoo|safari/.test(source)) types.push("Wildlife");
+    if (/desert|dune/.test(source)) types.push("Desert");
+    if (/forest|wood|jungle/.test(source)) types.push("Forest");
+    if (/island/.test(source)) types.push("Island");
+    if (/snow|ski|glacier/.test(source)) types.push("Snow");
+    if (/religious|church|temple|mosque|shrine/.test(source)) types.push("Religious");
+    if (/historic|history|castle|fort|monument|archaeological/.test(source)) types.push("Historical");
+    if (/nature|natural|park|waterfall|lake|garden/.test(source)) types.push("Nature");
+
+    return [...new Set(types)].slice(0, 4);
+};
+
+const classifySeasons = ({ latitude, kinds = "" }) => {
+    const absLat = Math.abs(Number(latitude) || 0);
+    const source = kinds.toLowerCase();
+
+    if (absLat < 25) {
+        if (/beach|coast|island|marine/.test(source)) {
+            return ["winter", "summer"];
+        }
+        return ["winter", "summer", "monsoon"];
+    }
+
+    if (absLat < 45) {
+        if (/mountain|snow|ski/.test(source)) {
+            return ["summer", "winter"];
+        }
+        return ["spring", "summer", "autumn", "winter"];
+    }
+
+    return ["summer", "autumn", "winter"];
+};
+
+const buildOpenTripMapDestination = ({
+    place,
+    nearby = [],
+    requestedName,
+}) => {
+    const nearbyNames = nearby
+        .map((item) => item.name)
+        .filter(Boolean)
+        .slice(0, 12);
+
+    const kinds = [
+        place.kinds || "",
+        ...nearby.map((item) => item.kinds || ""),
+    ].join(",");
+
+    const destinationTypes = classifyDestination({
+        name: place.name || requestedName,
+        kinds,
+        nearbyNames,
+    });
+
+    const placesToVisit = nearbyNames.slice(0, 8);
+
+    const beaches = nearby
+        .filter((item) => /beach|coast|seaside|marine/i.test(item.kinds || ""))
+        .map((item) => item.name)
+        .filter(Boolean)
+        .slice(0, 6);
+
+    const famousFor = [...destinationTypes, ...beaches.map(() => "local attractions")]
+        .filter(Boolean)
+        .slice(0, 8);
+
+    const description =
+        place.info?.descr ||
+        `${place.name || requestedName} is a destination identified through OpenTripMap place data. It can be explored through nearby attractions and activities, with destination type and season suggestions derived from available place categories and location.`;
+
+    return {
+        openTripMapXid: place.xid || null,
+        name: place.name || requestedName,
+        city: place.name || requestedName,
+        state: "",
+        country: place.country || "",
+        countryCode: place.country_code
+            ? String(place.country_code).toUpperCase()
+            : "",
+        placeType: place.kinds || "",
+        location: {
+            type: "Point",
+            coordinates: [
+                Number(place.lon),
+                Number(place.lat),
+            ],
+        },
+        description,
+        destinationType: destinationTypes,
+        seasons: classifySeasons({
+            latitude: place.lat,
+            kinds,
+        }),
+        placesToVisit,
+        beaches,
+        famousFor,
+        popularActivities: destinationTypes.includes("Beach")
+            ? ["Beach activities", "Sightseeing", "Local experiences"]
+            : ["Sightseeing", "Local experiences", "Outdoor activities"],
+        searchKeywords: [
+            requestedName,
+            place.name,
+            ...nearbyNames,
+        ].filter(Boolean),
+    };
+};
+
 const searchExternalDestinations = async (
     keyword,
     limit = 10
 ) => {
-
-    if (!keyword?.trim()) {
-        return [];
-    }
+    if (!keyword?.trim()) return [];
 
     try {
+        const geonameResponse = await openTripMapClient.get(
+            "/0.1/en/places/geoname",
+            {
+                params: {
+                    name: keyword.trim(),
+                    apikey: OPENTRIPMAP_API_KEY,
+                },
+            }
+        );
 
-        const response =
-            await geoapifyClient.get(
-                "/v1/geocode/search",
+        const place = geonameResponse.data;
+
+        if (!place?.lat || !place?.lon) {
+            return [];
+        }
+
+        let nearby = [];
+
+        try {
+            const radiusResponse = await openTripMapClient.get(
+                "/0.1/en/places/radius",
                 {
                     params: {
-                        text: keyword.trim(),
-
-                        limit: Math.min(
-                            Number(limit) || 10,
-                            20
-                        ),
-
-                        lang: "en",
-
-                        apiKey:
-                            GEOAPIFY_API_KEY,
+                        radius: 50000,
+                        lon: place.lon,
+                        lat: place.lat,
+                        limit: Math.min(Number(limit) || 10, 20),
+                        rate: 2,
+                        format: "json",
+                        apikey: OPENTRIPMAP_API_KEY,
                     },
                 }
             );
 
+            nearby = Array.isArray(radiusResponse.data)
+                ? radiusResponse.data
+                : [];
+        } catch (nearbyError) {
+            console.error(
+                "OpenTripMap nearby search failed:",
+                nearbyError.response?.data || nearbyError.message
+            );
+        }
 
-        const features =
-            response.data?.features || [];
+        const result = buildOpenTripMapDestination({
+            place,
+            nearby,
+            requestedName: keyword.trim(),
+        });
 
-
-        return features
-            .filter(
-                (feature) =>
-                    feature.geometry?.coordinates &&
-                    feature.geometry.coordinates.length === 2
-            )
-            .map((feature) => {
-
-                const properties =
-                    feature.properties || {};
-
-                const [
-                    longitude,
-                    latitude,
-                ] =
-                    feature.geometry.coordinates;
-
-
-                return {
-
-                    geoapifyPlaceId:
-                        properties.place_id ||
-                        null,
-
-                    name:
-                        properties.name ||
-                        properties.city ||
-                        properties.town ||
-                        properties.village ||
-                        properties.formatted ||
-                        keyword,
-
-                    city:
-                        properties.city ||
-                        properties.town ||
-                        properties.village ||
-                        "",
-
-                    state:
-                        properties.state ||
-                        "",
-
-                    country:
-                        properties.country ||
-                        "",
-
-                    countryCode:
-                        properties.country_code
-                            ? properties.country_code.toUpperCase()
-                            : "",
-
-                    placeType:
-                        properties.place_type ||
-                        "",
-
-                    location: {
-                        type: "Point",
-
-                        coordinates: [
-                            longitude,
-                            latitude,
-                        ],
-                    },
-
-                    primaryAirportIata:
-                        null,
-
-                    formatted:
-                        properties.formatted ||
-                        "",
-                };
-            });
-
+        return [result];
     } catch (error) {
-
         console.error(
-            "Geoapify destination search failed:",
-            error.response?.data ||
-            error.message
+            "OpenTripMap destination search failed:",
+            error.response?.data || error.message
         );
 
         throw new ApiError(
             502,
-            "Failed to search destinations using Geoapify."
+            "Failed to search destinations using OpenTripMap."
         );
     }
 };
-
 const searchDestinations = async (keyword, limit = 10, filters = {}) => {
     const { region, budgetTier, season, tripType } = filters;
     const query = { isActive: true };
@@ -579,34 +640,26 @@ const searchDestinations = async (keyword, limit = 10, filters = {}) => {
 
 const saveExternalDestination = async ({ destinationData }) => {
     const {
-        geoapifyPlaceId,
+        openTripMapXid,
         name,
         city,
-        state,
         country,
         countryCode,
-        placeType,
         location,
+        ...rest
     } = destinationData;
 
-    if (!geoapifyPlaceId) {
+    if (!openTripMapXid) {
         throw new ApiError(
             400,
-            "Geoapify place ID is required."
+            "OpenTripMap XID is required."
         );
     }
 
-    if (!name) {
+    if (!name || !country) {
         throw new ApiError(
             400,
-            "Destination name is required."
-        );
-    }
-
-    if (!country) {
-        throw new ApiError(
-            400,
-            "Country is required."
+            "Destination name and country are required."
         );
     }
 
@@ -622,12 +675,13 @@ const saveExternalDestination = async ({ destinationData }) => {
     }
 
     const existingDestination = await Destination.findOne({
-        geoapifyPlaceId,
+        openTripMapXid,
     });
 
     if (existingDestination) {
         return existingDestination;
     }
+
     const [longitude, latitude] = location.coordinates;
 
     const airportData = await findNearbyAirports({
@@ -643,21 +697,13 @@ const saveExternalDestination = async ({ destinationData }) => {
         }
     );
 
-    const destination = await Destination.create({
+    return await Destination.create({
+        ...rest,
+        openTripMapXid,
         name,
-        city,
-        state,
+        city: city || name,
         country,
         countryCode,
-        placeType,
-        geoapifyPlaceId,
-
-        primaryAirportIata:
-            airportData.primaryAirportIata,
-
-        nearbyAirports:
-            airportData.nearbyAirports,
-
         location: {
             type: "Point",
             coordinates: [
@@ -665,14 +711,12 @@ const saveExternalDestination = async ({ destinationData }) => {
                 Number(latitude),
             ],
         },
-
+        primaryAirportIata: airportData.primaryAirportIata,
+        nearbyAirports: airportData.nearbyAirports,
         slug,
         isActive: true,
     });
-
-    return destination;
 };
-
 const filterDestinations = async ({
     country,
     destinationType,
