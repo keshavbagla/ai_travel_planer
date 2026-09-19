@@ -104,6 +104,26 @@ const destinationSchema = new Schema(
       trim: true,
     },
 
+    region: {
+      type: String,
+      trim: true,
+      index: true,
+    },
+
+    budgetTier: {
+      type: String,
+      enum: ["Budget", "Mid-range", "Luxury"],
+      default: "Mid-range",
+      index: true,
+    },
+
+    seasons: [
+      {
+        type: String,
+        enum: ["spring", "summer", "monsoon", "autumn", "winter"],
+      },
+    ],
+
     destinationType: [
       {
         type: String,
@@ -214,6 +234,15 @@ const destinationSchema = new Schema(
     popularActivities: [
       String
     ],
+
+    placesToVisit: [String],
+
+    beaches: [String],
+
+    shopping: [String],
+
+    nightlife: [String],
+
 
     famousFor: [
       String
