@@ -206,29 +206,28 @@ const saveExternalDestination =
 
 const searchDestinations = asyncHandler(async (req, res) => {
     const {
+        q,
         keyword,
         limit = 10,
+        region,
+        budgetTier,
+        season,
+        tripType,
     } = req.query;
 
-    if (!keyword) {
-        throw new ApiError(
-            400,
-            "Search keyword is required."
-        );
+    const searchTerm = q?.trim() || keyword?.trim();
+    if (!searchTerm) {
+        throw new ApiError(400, "Search query is required. Use ?q=goa.");
     }
 
-    const destinations =
-        await destinationService.searchDestinations(
-            keyword,
-            limit
-        );
+    const destinations = await destinationService.searchDestinations(
+        searchTerm,
+        limit,
+        { region, budgetTier, season, tripType }
+    );
 
     return res.status(200).json(
-        new ApiResponse(
-            200,
-            destinations,
-            "Search completed successfully."
-        )
+        new ApiResponse(200, destinations, "Search completed successfully.")
     );
 });
 
