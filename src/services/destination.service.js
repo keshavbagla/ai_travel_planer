@@ -311,6 +311,45 @@ const getDestinationById = async (
     return destination;
 };
 
+const buildDestinationDescription = (destination) => {
+    if (destination.description?.trim()) return destination.description;
+
+    const name = destination.name || "This destination";
+    const types = (destination.destinationType || []).join(", ").toLowerCase();
+    const places = (destination.placesToVisit || []).slice(0, 8).join(", ");
+    const activities = (destination.popularActivities || []).slice(0, 8).join(", ");
+    const beaches = (destination.beaches || []).slice(0, 6).join(", ");
+    const famousFor = (destination.famousFor || []).slice(0, 8).join(", ");
+    const shopping = (destination.shopping || []).slice(0, 6).join(", ");
+
+    return [
+      name + (types ? ` is a ${types} destination known for its distinctive travel experiences.` : " is a popular destination for travelers."),
+      places ? `Places to visit include ${places}.` : "Explore the destination's major attractions, local neighborhoods and cultural landmarks.",
+      activities ? `Popular activities include ${activities}.` : "Visitors can combine sightseeing, local experiences and outdoor activities according to their trip style.",
+      beaches ? `Notable beaches or coastal areas include ${beaches}.` : "The surrounding natural scenery can be explored through day trips and outdoor experiences.",
+      famousFor ? `The destination is especially famous for ${famousFor}.` : "Local food, culture and scenery are important parts of the experience.",
+      shopping ? `For shopping, travelers can explore ${shopping}.` : "Local markets and shopping areas are useful for souvenirs and regional products.",
+      "Travelers can choose accommodation and dining based on their budget, location and preferred travel style.",
+      "The destination can be filtered by season, region, budget tier and trip type in the travel planner."
+    ].join(" ");
+};
+
+const normalizeDestination = (destination) => {
+    const item = { ...destination };
+    item.id = item._id?.toString?.() || item.id || item.geoapifyPlaceId || item.slug;
+    delete item._id;
+    item.description = buildDestinationDescription(item);
+    item.placesToVisit = item.placesToVisit || [];
+    item.activities = item.activities || [];
+    item.hotels = item.hotels || [];
+    item.restaurants = item.restaurants || [];
+    item.nightlife = item.nightlife || [];
+    item.beaches = item.beaches || [];
+    item.shopping = item.shopping || [];
+    item.famousFor = item.famousFor || [];
+    return item;
+};
+
 const searchLocalDestinations = async (
     keyword
 ) => {
@@ -366,7 +405,8 @@ const searchLocalDestinations = async (
 
 const searchExternalDestinations = async (
     keyword,
-    limit = 10
+    limit = 10,
+    filters = {}
 ) => {
 
     if (!keyword?.trim()) {
@@ -488,35 +528,49 @@ const searchExternalDestinations = async (
     }
 };
 
-const searchDestinations = async (
-    keyword,
-    limit = 10
-) => {
+const searchDestinations = async (keyword, limit = 10, filters = {}) => {
+    const { region, budgetTier, season, tripType } = filters;
+    const query = { isActive: true };
+    const text = keyword?.trim();
 
-    const local =
-        await searchLocalDestinations(
-            keyword
-        );
-
-    if (local.length > 0) {
-
-        return {
-            source: "database",
-            results: local,
-        };
+    if (text) {
+      query.$or = [
+        { name: { $regex: text, $options: "i" } },
+        { city: { $regex: text, $options: "i" } },
+        { state: { $regex: text, $options: "i" } },
+        { country: { $regex: text, $options: "i" } },
+        { searchKeywords: { $in: [new RegExp(text, "i")] } },
+      ];
+    }
+    if (region) query.region = { $regex: region, $options: "i" };
+    if (budgetTier) query.budgetTier = { $regex: budgetTier, $options: "i" };
+    if (season) query.seasons = season.toLowerCase();
+    if (tripType) {
+      const normalized = String(tripType).trim();
+      query.$or = [
+        ...(query.$or || []),
+        { travelStyles: normalized },
+        { suitableFor: normalized },
+        { destinationType: normalized },
+      ];
     }
 
-    const external =
-        await searchExternalDestinations(
-            keyword,
-            limit
-        );
+    const local = await Destination.find(query)
+      .select("-__v")
+      .sort({ popularityScore: -1, averageRating: -1, name: 1 })
+      .limit(Math.min(Number(limit) || 10, 30))
+      .lean();
 
+    if (local.length > 0) {
+      return { source: "database", results: local.map(normalizeDestination) };
+    }
 
-    return {
-        source: "geoapify",
-        results: external,
-    };
+    if (Object.keys(filters).some((key) => filters[key])) {
+      return { source: "database", results: [] };
+    }
+
+    const external = await searchExternalDestinations(keyword, limit);
+    return { source: "geoapify", results: external.map(normalizeDestination) };
 };
 
 const saveExternalDestination = async ({ destinationData }) => {
