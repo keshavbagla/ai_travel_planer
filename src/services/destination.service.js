@@ -405,8 +405,7 @@ const searchLocalDestinations = async (
 
 const searchExternalDestinations = async (
     keyword,
-    limit = 10,
-    filters = {}
+    limit = 10
 ) => {
 
     if (!keyword?.trim()) {
@@ -532,28 +531,33 @@ const searchDestinations = async (keyword, limit = 10, filters = {}) => {
     const { region, budgetTier, season, tripType } = filters;
     const query = { isActive: true };
     const text = keyword?.trim();
+    const andConditions = [];
 
     if (text) {
-      query.$or = [
-        { name: { $regex: text, $options: "i" } },
-        { city: { $regex: text, $options: "i" } },
-        { state: { $regex: text, $options: "i" } },
-        { country: { $regex: text, $options: "i" } },
-        { searchKeywords: { $in: [new RegExp(text, "i")] } },
-      ];
+      andConditions.push({
+        $or: [
+          { name: { $regex: text, $options: "i" } },
+          { city: { $regex: text, $options: "i" } },
+          { state: { $regex: text, $options: "i" } },
+          { country: { $regex: text, $options: "i" } },
+          { searchKeywords: { $in: [new RegExp(text, "i")] } },
+        ],
+      });
     }
     if (region) query.region = { $regex: region, $options: "i" };
     if (budgetTier) query.budgetTier = { $regex: budgetTier, $options: "i" };
     if (season) query.seasons = season.toLowerCase();
     if (tripType) {
       const normalized = String(tripType).trim();
-      query.$or = [
-        ...(query.$or || []),
-        { travelStyles: normalized },
-        { suitableFor: normalized },
-        { destinationType: normalized },
-      ];
+      andConditions.push({
+        $or: [
+          { travelStyles: normalized },
+          { suitableFor: normalized },
+          { destinationType: normalized },
+        ],
+      });
     }
+    if (andConditions.length) query.$and = andConditions;
 
     const local = await Destination.find(query)
       .select("-__v")
