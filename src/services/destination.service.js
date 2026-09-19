@@ -590,54 +590,51 @@ const searchExternalDestinations = async (
 };
 const searchDestinations = async (keyword, limit = 10, filters = {}) => {
     const { region, budgetTier, season, tripType } = filters;
-    const query = { isActive: true };
     const text = keyword?.trim();
-    const andConditions = [];
 
-    if (text) {
-      andConditions.push({
-        $or: [
-          { name: { $regex: text, $options: "i" } },
-          { city: { $regex: text, $options: "i" } },
-          { state: { $regex: text, $options: "i" } },
-          { country: { $regex: text, $options: "i" } },
-          { searchKeywords: { $in: [new RegExp(text, "i")] } },
-        ],
-      });
-    }
-    if (region) query.region = { $regex: region, $options: "i" };
-    if (budgetTier) query.budgetTier = { $regex: budgetTier, $options: "i" };
-    if (season) query.seasons = season.toLowerCase();
-    if (tripType) {
-      const normalized = String(tripType).trim();
-      andConditions.push({
-        $or: [
-          { travelStyles: normalized },
-          { suitableFor: normalized },
-          { destinationType: normalized },
-        ],
-      });
-    }
-    if (andConditions.length) query.$and = andConditions;
-
-    const local = await Destination.find(query)
-      .select("-__v")
-      .sort({ popularityScore: -1, averageRating: -1, name: 1 })
-      .limit(Math.min(Number(limit) || 10, 30))
-      .lean();
-
-    if (local.length > 0) {
-      return { source: "database", results: local.map(normalizeDestination) };
+    if (!text) {
+        return { source: "opentripmap", results: [] };
     }
 
-    if (Object.keys(filters).some((key) => filters[key])) {
-      return { source: "database", results: [] };
-    }
+    // OpenTripMap is the source of truth for destination discovery.
+    // MongoDB remains the application's enrichment/cache layer, not the
+    // primary source for destination search.
+    const external = await searchExternalDestinations(text, limit);
 
-    const external = await searchExternalDestinations(keyword, limit);
-    return { source: "geoapify", results: external.map(normalizeDestination) };
+    const filtered = external.filter((item) => {
+        if (region && item.region &&
+            !item.region.toLowerCase().includes(String(region).toLowerCase())) {
+            return false;
+        }
+
+        if (budgetTier && item.budgetTier &&
+            item.budgetTier.toLowerCase() !== String(budgetTier).toLowerCase()) {
+            return false;
+        }
+
+        if (season && Array.isArray(item.seasons) &&
+            !item.seasons.includes(String(season).toLowerCase())) {
+            return false;
+        }
+
+        if (tripType) {
+            const wanted = String(tripType).trim().toLowerCase();
+            const matches =
+                (item.destinationType || []).some((value) => value.toLowerCase() === wanted) ||
+                (item.travelStyles || []).some((value) => value.toLowerCase() === wanted) ||
+                (item.suitableFor || []).some((value) => value.toLowerCase() === wanted);
+
+            if (!matches) return false;
+        }
+
+        return true;
+    });
+
+    return {
+        source: "opentripmap",
+        results: filtered.map(normalizeDestination),
+    };
 };
-
 const saveExternalDestination = async ({ destinationData }) => {
     const {
         openTripMapXid,
