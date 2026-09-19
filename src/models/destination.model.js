@@ -177,6 +177,13 @@ const destinationSchema = new Schema(
       default: ""
     },
     
+    openTripMapXid: {
+        type: String,
+        trim: true,
+        index: true,
+    },
+
+    // Kept for backwards compatibility with previously saved Geoapify records.
     geoapifyPlaceId: {
         type: String,
         trim: true,
